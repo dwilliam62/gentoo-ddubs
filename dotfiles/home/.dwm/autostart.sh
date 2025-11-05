@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+xrandr --output Virtual-1 --mode 1920x1080
 
 slstatus &
 
@@ -7,11 +8,11 @@ slstatus &
 ~/.screenlayout/laptop.sh 
 
 # vm 
-~/.screenlayout/vm.sh 
+[ -x ~/.screenlayout/vm.sh ] ~/.screenlayout/vm.sh ~/.screenlayout/vm.sh  ~/.screenlayout/vm.sh &
 
 
 # polkit
-/run/wrappers/bin/polkit-agent-helper-1
+/run/wrappers/bin/polkit-agent-helper-1 &
 #/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
 
 # background
@@ -34,6 +35,6 @@ pkill variety
 pkill flameshot
 sleep 0.5 
 volumeicon & 
-variety & 
+variety --minimize --config /home/dwilliams/.config/variety/variety.conf & 
 flameshot & 
 

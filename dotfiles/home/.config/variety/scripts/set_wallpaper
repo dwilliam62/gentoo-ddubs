@@ -7,7 +7,9 @@
 #
 # Occasionally new versions of this script are released to bring support for new desktops. To apply them, you
 # should either delete this copy (in ~/.config/variety/scripts/) and restart Variety, or merge in the changes yourself.
-# Bug fixes are automatically applied by Variety provided the local copy is never changed.
+# Bug fixes are automatically applied by Variety **only if** the local copy was never changed by the user. If there
+# were user-made changes to it, Variety would assume the existing script works for the user and would not overwrite it
+# on upgrade.
 #
 # PARAMETERS:
 # $1: The first passed parameter is the absolute path to the wallpaper image to be set as wallpaper
@@ -243,7 +245,10 @@ elif [ "$DE" == "sway" ]; then
         swaybg -i "$WP" -m fill &
         if [ -n "$PID" ]; then
             sleep 1
-            kill "$PID" 2>/dev/null
+            read -r -a PID <<< "$PID"
+            for each_pid in "${PID[@]}"; do
+                kill "$each_pid" 2>/dev/null
+            done
         fi
     else
         swaymsg output "*" bg "$WP" fill 2>/dev/null
@@ -280,6 +285,9 @@ elif [ "$DE" == "awesome" ]; then
     # NOTE: This config will change the wallpaper after your current awesome theme sets it.
     # As such, the theme's wallpaper will briefly appear before being replaced with Variety's wallpaper.
     echo "for s in screen do require(\"gears\").wallpaper.maximized(\"$1\", s) end" | awesome-client
+
+elif [[ "$XDG_CURRENT_DESKTOP" == "COSMIC" ]]; then
+    sed -r --in-place 's,source: Path\(".+"\),source: Path("'"$3"'"),gm' ~/.config/cosmic/com.system76.CosmicBackground/v1/all
 
 else
     # For simple WMs, use either feh or nitrogen

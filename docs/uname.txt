@@ -1,1 +1,1 @@
-Linux ixas 6.17.5 #1-NixOS SMP PREEMPT_DYNAMIC Thu Oct 23 14:24:41 UTC 2025 x86_64 GNU/Linux
+Linux gentoo 6.17.7-gentoo-dist #1 SMP PREEMPT_DYNAMIC Sun Nov  2 16:57:35 -00 2025 x86_64 Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz GenuineIntel GNU/Linux

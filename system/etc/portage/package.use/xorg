@@ -243,3 +243,8 @@ media-libs/libglvmd X
 # required by gnome-extra/yad-14.1::guru[webkit]
 # required by gnome-extra/yad (argument)
 >=media-libs/gst-plugins-base-1.24.11-r1 opengl
+# required by x11-libs/pango-1.57.0::gentoo
+# required by x11-misc/dunst-1.13.0-r1::gentoo
+# required by virtual/notification-daemon-0::gentoo[-gnome,-kde]
+# required by x11-libs/libnotify-0.8.6::gentoo
+>=x11-libs/cairo-1.18.4-r1 X

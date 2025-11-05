@@ -19,11 +19,11 @@ super + shift + b
     "wezterm -e yazi"
 
  # Variety Next image
-   super + shift + right
+   super + alt + right
      variety -n
 
  # Variety Previous image
-   super + shft + left
+   super + alt + left
      variety -p
 
 # Launch Rofi Application Menu
@@ -116,3 +116,15 @@ super + alt + s
 # Power Off/Reboot
 super + x 
 	~/.config/suckless/scripts/power
+# Variety controls
+super + alt + v
+    variety --preferences
+super + alt + right
+    variety --next
+super + alt + left
+    variety --previous
+EOF
+# restart sxhkd
+pkill -x sxhkd || true; nohup sxhkd -c "$SX" >/dev/null 2>&1 & disown;
+# verify pangocairo in ImageMagick
+convert -list configure | grep -iE "DELEGATES|PANGO|RSVG|XML" | sed -n "1,120p"
