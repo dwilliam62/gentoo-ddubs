@@ -1,0 +1,86 @@
+Portage 3.0.70 (python 3.13.9-final-0, default/linux/amd64/23.0/systemd, gcc-15, glibc-2.42-r2, 6.17.7-gentoo-dist x86_64)
+=================================================================
+System uname: Linux-6.17.7-gentoo-dist-x86_64-Intel-R-_Xeon-R-_CPU_E5-2690_v4_@_2.60GHz-with-glibc2.42
+KiB Mem:    16338260 total,  15054896 free
+KiB Swap:   33554428 total,  33554428 free
+Timestamp of repository gentoo: Mon, 03 Nov 2025 00:30:00 +0000
+Head commit of repository gentoo: 4e6f86142ad792eebca237f8e37cc6013bcda900
+Timestamp of repository guru: Sun, 02 Nov 2025 05:33:30 +0000
+Head commit of repository guru: df981e51925e624de1cc1be04770c6c14f6e6075
+
+sh bash 5.3_p3-r3
+ld GNU ld (Gentoo 2.45 p3) 2.45.0
+app-misc/pax-utils:        1.3.8::gentoo
+app-shells/bash:           5.3_p3-r3::gentoo
+dev-build/autoconf:        2.13-r8::gentoo, 2.72-r4::gentoo
+dev-build/automake:        1.18.1::gentoo
+dev-build/cmake:           4.1.2-r1::gentoo
+dev-build/libtool:         2.5.4::gentoo
+dev-build/make:            4.4.1-r101::gentoo
+dev-build/meson:           1.9.1::gentoo
+dev-lang/perl:             5.42.0::gentoo
+dev-lang/python:           3.13.9::gentoo, 3.14.0::gentoo
+dev-lang/rust-bin:         1.86.0-r1::gentoo, 1.91.0::gentoo
+llvm-core/clang:           20.1.8::gentoo, 21.1.4::gentoo
+llvm-core/llvm:            20.1.8::gentoo, 21.1.4::gentoo
+sys-apps/baselayout:       2.18::gentoo
+sys-apps/sandbox:          2.46::gentoo
+sys-apps/systemd:          258.1::gentoo
+sys-devel/binutils:        2.45-r1::gentoo
+sys-devel/binutils-config: 5.6::gentoo
+sys-devel/gcc:             15.2.1_p20251018::gentoo
+sys-devel/gcc-config:      2.12.2::gentoo
+sys-kernel/linux-headers:  6.17-r1::gentoo (virtual/os-headers)
+sys-libs/glibc:            2.42-r2::gentoo
+Repositories:
+
+gentoo
+    location: /var/db/repos/gentoo
+    sync-type: rsync
+    sync-uri: rsync://rsync.gentoo.org/gentoo-portage
+    priority: -1000
+    volatile: False
+    sync-rsync-verify-jobs: 1
+    sync-rsync-verify-metamanifest: yes
+    sync-rsync-extra-opts: 
+    sync-rsync-verify-max-age: 3
+
+guru
+    location: /var/db/repos/guru
+    sync-type: git
+    sync-uri: https://github.com/gentoo-mirror/guru.git
+    masters: gentoo
+    volatile: False
+
+Binary Repositories:
+
+gentoobinhost
+    priority: 1
+    sync-uri: https://distfiles.gentoo.org/releases/amd64/binpackages/23.0/x86-64
+
+ACCEPT_KEYWORDS="amd64 ~amd64"
+ACCEPT_LICENSE="@FREE"
+CBUILD="x86_64-pc-linux-gnu"
+CFLAGS="-O2 -pipe"
+CHOST="x86_64-pc-linux-gnu"
+CONFIG_PROTECT="/etc /usr/share/config /usr/share/gnupg/qualified.txt"
+CONFIG_PROTECT_MASK="/etc/ca-certificates.conf /etc/env.d /etc/fonts/fonts.conf /etc/gconf /etc/gentoo-release /etc/revdep-rebuild /etc/sandbox.d"
+CXXFLAGS="-O2 -pipe"
+DISTDIR="/var/cache/distfiles"
+ENV_UNSET="CARGO_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY GDK_PIXBUF_MODULE_FILE GOBIN GOPATH PERL5LIB PERL5OPT PERLPREFIX PERL_CORE PERL_MB_OPT PERL_MM_OPT XAUTHORITY XDG_CACHE_HOME XDG_CONFIG_HOME XDG_DATA_HOME XDG_RUNTIME_DIR XDG_STATE_HOME"
+FCFLAGS="-O2 -pipe"
+FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg-live config-protect-if-modified distlocks ebuild-locks fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+FFLAGS="-O2 -pipe"
+GENTOO_MIRRORS="http://distfiles.gentoo.org"
+LANG="en_US.utf8"
+LDFLAGS="-Wl,-O1 -Wl,--as-needed -Wl,-z,pack-relative-relocs"
+LEX="flex"
+MAKEOPTS="-j8"
+PKGDIR="/var/cache/binpkgs"
+PORTAGE_CONFIGROOT="/"
+PORTAGE_RSYNC_OPTS="--recursive --links --safe-links --perms --times --omit-dir-times --compress --force --whole-file --delete --stats --human-readable --timeout=180 --exclude=/distfiles --exclude=/local --exclude=/packages --exclude=/.git"
+PORTAGE_TMPDIR="/var/tmp"
+SHELL="/bin/bash"
+USE="X acl amd64 bzip2 cet crypt gdbm iconv ipv6 libtirpc multilib ncurses nls openmp pam pcre readline seccomp ssl systemd test-rust udev unicode wayland xattr zlib" ABI_X86="64" ADA_TARGET="gcc_14" APACHE2_MODULES="authn_core authz_core socache_shmcb unixd actions alias auth_basic authn_anon authn_dbm authn_file authz_dbm authz_groupfile authz_host authz_owner authz_user autoindex cache cgi cgid dav dav_fs dav_lock deflate dir env expires ext_filter file_cache filter headers include info log_config logio mime mime_magic negotiation rewrite setenvif speling status unique_id userdir usertrack vhost_alias" CALLIGRA_FEATURES="karbon sheets words" COLLECTD_PLUGINS="df interface irq load memory rrdtool swap syslog" CPU_FLAGS_X86="mmx mmxext sse sse2" ELIBC="glibc" GPSD_PROTOCOLS="ashtech aivdm earthmate evermore fv18 garmin garmintxt gpsclock greis isync itrax navcom oceanserver oncore rtcm104v2 rtcm104v3 sirf skytraq superstar2 tsip tripmate tnt ublox" GRUB_PLATFORMS="efi-64" GUILE_SINGLE_TARGET="3-0" GUILE_TARGETS="3-0" INPUT_DEVICES="libinput keyboard mouse" KERNEL="linux" LCD_DEVICES="bayrad cfontz glk hd44780 lb216 lcdm001 mtxorb text" LLVM_TARGETS="X86" LUA_SINGLE_TARGET="lua5-1" LUA_TARGETS="lua5-1" OFFICE_IMPLEMENTATION="libreoffice" PHP_TARGETS="php8-3" POSTGRES_TARGETS="postgres17" PYTHON_SINGLE_TARGET="python3_13" PYTHON_TARGETS="python3_13" RUBY_TARGETS="ruby32 ruby33" VIDEO_CARDS="amdgpu intel virtio" XTABLES_ADDONS="quota2 psd pknock lscan length2 ipv4options ipp2p iface geoip fuzzy condition tarpit sysrq proto logmark ipmark dhcpmac delude chaos account"
+Unset:  ADDR2LINE, AR, ARFLAGS, AS, ASFLAGS, CC, CCLD, CONFIG_SHELL, CPP, CPPFLAGS, CTARGET, CXX, CXXFILT, ELFEDIT, EMERGE_DEFAULT_OPTS, EXTRA_ECONF, F77FLAGS, FC, GCOV, GPROF, INSTALL_MASK, LC_ALL, LD, LFLAGS, LIBTOOL, LINGUAS, MAKE, MAKEFLAGS, NM, OBJCOPY, OBJDUMP, PORTAGE_BINHOST, PORTAGE_BUNZIP2_COMMAND, PORTAGE_COMPRESS, PORTAGE_COMPRESS_FLAGS, PORTAGE_RSYNC_EXTRA_OPTS, PYTHONPATH, RANLIB, READELF, RUSTFLAGS, SIZE, STRINGS, STRIP, YACC, YFLAGS
+

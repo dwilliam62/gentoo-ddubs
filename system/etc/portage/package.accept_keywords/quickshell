@@ -1,0 +1,4 @@
+gui-apps/quickshell ** 
+dev-util/breakpad ***
+dev-libs/linux-syscall-support ** 
+dev-embedded/libdisasm **

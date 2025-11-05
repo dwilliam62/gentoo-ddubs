@@ -1,0 +1,5 @@
+# Enforce opengl and other common Wayland/Desktop flags for Qt6
+dev-qt/qtbase opengl
+dev-qt/qttools opengl
+dev-qt/qtdeclarative opengl
+
