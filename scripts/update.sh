@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Gentoo system updater
 # - Syncs Portage tree (emerge --sync)
-# - Evaluates pending upgrades and writes a markdown summary to precheck.md
+# - Evaluates pending upgrades and writes a markdown summary to precheck-<DATE>.md
 # - Performs update of @world (deep, newuse) only when explicitly initiated
 # - Optionally --dry-run to preview without changes
 # - Writes a post-update markdown report: Post-Update-<DATE>-Report.md
@@ -12,8 +12,8 @@ set -euo pipefail
 #   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--auto-yes] [--help]
 #
 # Modes (choose one):
-#   --eval        Only evaluate and write precheck.md. No changes are made.
-#   --dry-run     Preview update actions (pretend). Writes precheck.md. No changes are made.
+#   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
+#   --dry-run     Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
 #   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
 #
 # Options:
@@ -26,9 +26,9 @@ set -euo pipefail
 # - Post-Update-<DATE>-Report.md is only generated after a successful --apply run.
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-log_dir="$repo_root"
-precheck_md="$log_dir/precheck.md"
+log_dir="$HOME/Documents"
 now_ts="$(date +%Y%m%d-%H%M%S)"
+precheck_md="$log_dir/precheck-${now_ts}.md"
 post_md="$log_dir/Post-Update-${now_ts}-Report.md"
 
 say() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
@@ -39,8 +39,8 @@ Usage:
   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--auto-yes] [--help]
 
 Modes (choose one):
-  --eval        Only evaluate and write precheck.md. No changes are made.
-  --dry-run     Preview update actions (pretend). Writes precheck.md. No changes are made.
+  --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
+  --dry-run     Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
 
 Options:
