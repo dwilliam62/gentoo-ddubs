@@ -1,9 +1,9 @@
-3
-/home/dwilliams/Pictures/wallpaper/Ship-on-moutain-river.png
-/home/dwilliams/Pictures/wallpaper/Rainy-Night-Japan.png
-/home/dwilliams/Pictures/wallpaper/Village-Dark.png
-/home/dwilliams/Pictures/wallpaper/Art-Factory-with-waterfall.png
+0
+/home/dwilliams/Pictures/wallpaper/Courtside-Sunset.png
 /usr/share/backgrounds/gnome/adwaita-l.jpg
+/home/dwilliams/Pictures/wallpaper/japan-street-Dark.png
+/home/dwilliams/Pictures/wallpaper/car1.png
+/home/dwilliams/Pictures/wallpaper/NixosAnime1.png
 /home/dwilliams/Pictures/wallpaper/Foggy-lake.png
 /home/dwilliams/Pictures/wallpaper/Garden-Light.png
 /home/dwilliams/Pictures/wallpaper/moon.png

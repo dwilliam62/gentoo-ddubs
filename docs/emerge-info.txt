@@ -1,10 +1,10 @@
-Portage 3.0.70 (python 3.13.9-final-0, default/linux/amd64/23.0/systemd, gcc-15, glibc-2.42-r2, 6.17.7-gentoo-dist x86_64)
+Portage 3.0.71 (python 3.13.9-final-0, default/linux/amd64/23.0/systemd, gcc-15, glibc-2.42-r2, 6.17.7-gentoo-dist x86_64)
 =================================================================
 System uname: Linux-6.17.7-gentoo-dist-x86_64-Intel-R-_Xeon-R-_CPU_E5-2690_v4_@_2.60GHz-with-glibc2.42
-KiB Mem:    16338252 total,  10425316 free
+KiB Mem:    16338260 total,  14757052 free
 KiB Swap:   33554428 total,  33554428 free
-Timestamp of repository gentoo: Mon, 03 Nov 2025 00:30:00 +0000
-Head commit of repository gentoo: 4e6f86142ad792eebca237f8e37cc6013bcda900
+Timestamp of repository gentoo: Thu, 06 Nov 2025 05:15:00 +0000
+Head commit of repository gentoo: 704c54046e7cff802898b0b08cf7647b6c5c2b57
 Timestamp of repository guru: Wed, 05 Nov 2025 10:35:43 +0000
 Head commit of repository guru: b3eaa1dddcd089c59254cc610db16b8b627701a0
 
@@ -19,10 +19,10 @@ dev-build/libtool:         2.5.4::gentoo
 dev-build/make:            4.4.1-r101::gentoo
 dev-build/meson:           1.9.1::gentoo
 dev-lang/perl:             5.42.0::gentoo
-dev-lang/python:           3.13.9::gentoo, 3.14.0::gentoo
+dev-lang/python:           3.13.9::gentoo, 3.14.0_p1::gentoo
 dev-lang/rust-bin:         1.77.1-r102::gentoo, 1.86.0-r1::gentoo, 1.91.0::gentoo
-llvm-core/clang:           20.1.8::gentoo, 21.1.4::gentoo
-llvm-core/llvm:            20.1.8::gentoo, 21.1.4::gentoo
+llvm-core/clang:           20.1.8::gentoo, 21.1.5::gentoo
+llvm-core/llvm:            20.1.8::gentoo, 21.1.5::gentoo
 sys-apps/baselayout:       2.18::gentoo
 sys-apps/sandbox:          2.46::gentoo
 sys-apps/systemd:          258.1::gentoo
@@ -42,8 +42,8 @@ gentoo
     volatile: False
     sync-rsync-extra-opts: 
     sync-rsync-verify-max-age: 3
-    sync-rsync-verify-metamanifest: yes
     sync-rsync-verify-jobs: 1
+    sync-rsync-verify-metamanifest: yes
 
 guru
     location: /var/db/repos/guru
