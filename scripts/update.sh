@@ -4,23 +4,26 @@ set -euo pipefail
 # Gentoo system updater
 # - Syncs Portage tree (emerge --sync)
 # - Evaluates pending upgrades and writes a markdown summary to precheck.md
-# - Performs update of @world (deep, newuse)
+# - Performs update of @world (deep, newuse) only when explicitly initiated
 # - Optionally --dry-run to preview without changes
 # - Writes a post-update markdown report: Post-Update-<DATE>-Report.md
 #
 # Usage:
-#   bash scripts/update.sh [--eval] [--dry-run] [--no-sync] [--auto-yes] [--help]
+#   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--auto-yes] [--help]
 #
-# Options:
+# Modes (choose one):
 #   --eval        Only evaluate and write precheck.md. No changes are made.
 #   --dry-run     Preview update actions (pretend). Writes precheck.md. No changes are made.
+#   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
+#
+# Options:
 #   --no-sync     Do not run emerge --sync first.
 #   --auto-yes    Proceed with updates without interactive prompt (omit --ask).
 #   --help        Show this help and exit.
 #
 # Notes:
-# - Root privileges are required for actual updates. The script will re-exec via sudo when needed.
-# - Post-Update-<DATE>-Report.md is only generated after a successful, non-dry-run update.
+# - Running with no arguments shows this help and exits; updates are never implicit.
+# - Post-Update-<DATE>-Report.md is only generated after a successful --apply run.
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 log_dir="$repo_root"
@@ -31,27 +34,39 @@ post_md="$log_dir/Post-Update-${now_ts}-Report.md"
 say() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
 
 print_usage() {
-  sed -n '1,45p' "$0" | sed -n '1,45p' | sed -n '1,45p' | awk 'BEGIN{print "Usage:\n  bash scripts/update.sh [--eval] [--dry-run] [--no-sync] [--auto-yes] [--help]\n"} { if (NR>1) exit }'
   cat <<'EOF'
-Options:
+Usage:
+  bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--auto-yes] [--help]
+
+Modes (choose one):
   --eval        Only evaluate and write precheck.md. No changes are made.
   --dry-run     Preview update actions (pretend). Writes precheck.md. No changes are made.
+  --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
+
+Options:
   --no-sync     Do not run emerge --sync first.
   --auto-yes    Proceed with updates without interactive prompt (omit --ask).
   --help        Show this help and exit.
+
+Examples:
+  bash scripts/update.sh --eval
+  bash scripts/update.sh --dry-run --no-sync
+  bash scripts/update.sh --apply --auto-yes
 EOF
 }
 
 need_root() {
-  if [ "${1:-update}" = "update" ] && [ "${DRY_RUN:-false}" != "true" ]; then
+  # Only escalate when actually applying changes
+  if [ "${APPLY:-false}" = "true" ]; then
     [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
-    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" NO_SYNC="${NO_SYNC:-false}" AUTO_YES="${AUTO_YES:-false}" bash "$0" "$@"
+    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" bash "$0" "$@"
   fi
 }
 
 # Parse args
 DRY_RUN="false"
 EVAL_ONLY="false"
+APPLY="false"
 NO_SYNC="false"
 AUTO_YES="false"
 args=()
@@ -59,12 +74,19 @@ for a in "$@"; do
   case "$a" in
     --dry-run) DRY_RUN="true" ;;
     --eval) EVAL_ONLY="true" ;;
+    --apply) APPLY="true" ;;
     --no-sync) NO_SYNC="true" ;;
     --auto-yes) AUTO_YES="true" ;;
     --help|-h) print_usage; exit 0 ;;
     *) args+=("$a") ;;
   esac
 done
+
+# If no mode was selected, show help and exit (do nothing by default)
+if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false" ]; then
+  print_usage
+  exit 2
+fi
 
 # Common emerge flags
 EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --color=n @world)
@@ -172,14 +194,12 @@ write_post_update_report() {
 }
 
 main() {
-  # For actual updates (non-dry-run eval=false), ensure we have root
-  if [ "$EVAL_ONLY" = "true" ] || [ "$DRY_RUN" = "true" ]; then
-    : # no root escalation needed
-  else
+  # For actual updates, ensure we have root
+  if [ "$APPLY" = "true" ]; then
     need_root update "$@"
   fi
 
-  # Sync if requested/default
+  # Sync if requested/default (only when a mode was selected)
   maybe_sync
 
   say "Evaluating pending updates (pretend)..."
@@ -198,6 +218,12 @@ main() {
 
   if [ "$DRY_RUN" = "true" ]; then
     say "Dry-run requested; no changes applied."
+    exit 0
+  fi
+
+  if [ "$APPLY" != "true" ]; then
+    # Should not reach here due to earlier guard, but be safe
+    say "No apply requested; exiting."
     exit 0
   fi
 
