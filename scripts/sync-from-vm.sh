@@ -7,21 +7,40 @@ set -euo pipefail
 # - Refreshes docs (emerge-info, eselect-profile, uname)
 #
 # Usage:
-#   bash scripts/sync-from-vm.sh [--include-system] [--dry-run]
+#   bash scripts/sync-from-vm.sh [--include-system] [--dry-run|-n] [--help|-h]
 #
-# Notes:
-# - Use --include-system if you want to refresh system/ from this VM (may require sudo for some paths).
-# - --dry-run adds rsync -n for preview.
+# Options:
+#   --include-system   Include system snapshot (may require sudo).
+#   --dry-run, -n      Preview rsync changes only.
+#   --help, -h         Show this help and exit.
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 
+print_usage() {
+  cat <<'EOF'
+Usage:
+  bash scripts/sync-from-vm.sh [--include-system] [--dry-run|-n] [--help|-h]
+
+Options:
+  --include-system   Include system snapshot (may require sudo).
+  --dry-run, -n      Preview rsync changes only.
+  --help, -h         Show this help and exit.
+EOF
+}
+
 dry_run=""
 include_system="false"
-for arg in "${@:-}"; do
+for arg in "$@"; do
   case "$arg" in
-    --dry-run) dry_run="-n" ;;
+    --dry-run|-n) dry_run="-n" ;;
     --include-system) include_system="true" ;;
-    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+    --help|-h) print_usage; exit 0 ;;
+    *)
+      echo "Unknown arg: $arg" >&2
+      echo >&2
+      print_usage >&2
+      exit 2
+      ;;
   esac
 done
 
