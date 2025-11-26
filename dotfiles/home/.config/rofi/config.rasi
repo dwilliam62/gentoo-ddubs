@@ -1,123 +1,23 @@
-  * {
-        bg: #161616;
-        background-color: @bg;
-    }
+/* ---- 💫 https://github.com/JaKooLit 💫 ---- */
+/* Ja KooLit - Default 
 
-    configuration {
-	    show-icons: true;
-	    icon-theme: "Papirus";
-	    location: 0;
-	    font: "JetBrainsMono Nerd Font 12";	
-	    display-drun: "Launch:";
-    }
+* All main themes or configs are located in ~/.config/rofi/themes/
+* If you want to edit the config, that is where you should edit NOT here 
 
-    window { 
-	    width: 45%;
-	    transparency: "real";
-	    orientation: vertical;
-	    border-color: #DBC704;
-        border-radius: 10px;
-    }
+* To load a new theme, manually edit the file path below or choose desired theme via rofi theme selector (choose via app menu)
 
-    mainbox {
-	    children: [inputbar, listview];
-    }
+* Alternative way to Load (preferred) own cooked by Ja 
+* SUPER CTRL R - Choose style & SUPER CTRL SHIFT R 
+
+* TIPS 
+* If you have edited a config, rename it with a unique name. During update, the contents of 
+* ~/.config/rofi/themes/ will be replaced. */
+
+/* ---- Global Configuration Fonts ---- */
+@import "~/.config/rofi/0-shared-fonts.rasi"
+
+/* note: Main themes in ~/.config/rofi/themes */
+/* You can manually change here or you can use rofi theme selector SUPER SHIFT E */
 
 
-    // ELEMENT
-    // -----------------------------------
-
-    element {
-	    padding: 4 12;
-	    text-color: #161616;
-        border-radius: 5px;
-    }
-
-    element selected {
-	    text-color: #ffffff;
-	    background-color: #DBC704;
-    }
-
-    element-text {
-	    background-color: inherit;
-	    text-color: inherit;
-    }
-
-    element-icon {
-	    size: 16 px;
-	    background-color: inherit;
-	    padding: 0 6 0 0;
-	    alignment: vertical;
-    }
-
-	element.selected.active {
-		background-color: #161616;
-		text-color: #F2F4F8;
-	}
- 
-	element.alternate.normal {
-		background-color: #161616;
-		text-color: #F2F4F8;
-	}
-
- 
-	element.alternate.active {
-		background-color: #ff8f40;
-		text-color: #F2F4F8;
-	}
-
-	element.selected.normal {
-		background-color: #ff8f40;
-		text-color: #161616;
-	}
- 
-
-	element.normal.active {
-		background-color: #161616;
-		text-color: #F2F4F8;
-	}
- 
-
-	element.normal.normal {
-		background-color: #161616;
-		text-color: #F2F4F8;
-	}
- 
-	element.normal.urgent {
-		background-color: #f25d78;
-		text-color: #161616;
-	}
-
-	
-
-    listview {
-	    columns: 2;
-	    lines: 9;
-	    padding: 8 0;
-	    fixed-height: true;
-	    fixed-columns: true;
-	    fixed-lines: true;
-	    border: 0 10 6 10;
-    }
-
-    // INPUT BAR 
-    //------------------------------------------------
-
-    entry {
-	    text-color: #f27893;
-	    padding: 10 10 0 0;
-	    margin: 0 -2 0 0;
-    }
-
-    inputbar {
-	    padding: 10 0 0;
-	    margin: 0 0 0 0;
-    } 
-
-    prompt {
-	    text-color: #78a9ff;
-	    padding: 10 6 0 10;
-	    margin: 0 -2 0 0;
-    }
-
-
+@theme "~/.config/rofi/themes/KooL_style-4.rasi"

@@ -1,4 +1,7 @@
 0
+/home/dwilliams/Pictures/wallpaper/moon.png
+/home/dwilliams/Pictures/wallpaper/crazy-pink-waves.png
+/home/dwilliams/Pictures/wallpaper/pastel-lake.png
 /home/dwilliams/Pictures/wallpaper/Courtside-Sunset.png
 /usr/share/backgrounds/gnome/adwaita-l.jpg
 /home/dwilliams/Pictures/wallpaper/japan-street-Dark.png
