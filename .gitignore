@@ -1,2 +1,8 @@
 collected/
 *.tar.gz
+
+# Sync logs and temporary files
+.sync-logs/
+system/var/lib/portage/preserved_libs_registry
+system/var/lib/portage/config
+system/var/lib/portage/repo_revisions
