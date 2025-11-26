@@ -1,0 +1,10 @@
+# Enable JPEG support for the core image library
+x11-libs/gdk-pixbuf jpeg
+
+# Enable the dedicated JPEG plugin for Tumbler (optional, but good practice)
+xfce-base/tumbler jpeg
+
+## When done run: 
+# This file should be here 
+# sudo nvim /etc/portage/package.use/tumbler-fix
+#  sudo emerge --ask --changed-use --deep @world
