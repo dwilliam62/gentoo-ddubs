@@ -248,3 +248,7 @@ media-libs/libglvmd X
 # required by virtual/notification-daemon-0::gentoo[-gnome,-kde]
 # required by x11-libs/libnotify-0.8.6::gentoo
 >=x11-libs/cairo-1.18.4-r1 X
+# required by xfce-base/xfce4-panel-4.20.5::gentoo[dbusmenu]
+# required by xfce-base/thunar-4.20.6::gentoo[trash-panel-plugin]
+# required by thunar (argument)
+>=dev-libs/libdbusmenu-16.04.0-r4 gtk3

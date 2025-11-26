@@ -1,1 +1,2 @@
 sys-kernel/linux-firmware @BINARY-REDISTRIBUTABLE
+app-editors/vscode Microsoft-vscode

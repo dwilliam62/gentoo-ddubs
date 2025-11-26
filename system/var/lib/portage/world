@@ -3,6 +3,7 @@ app-editors/mousepad
 app-editors/nano
 app-editors/neovim
 app-editors/vim
+app-editors/vscode
 app-emulation/qemu-guest-agent
 app-eselect/eselect-repository
 app-misc/brightnessctl
@@ -14,6 +15,8 @@ app-misc/tmux
 app-misc/yazi
 app-portage/eix
 app-portage/gentoolkit
+app-shells/direnv
+app-shells/fish
 app-shells/starship
 app-shells/zoxide
 app-shells/zsh
@@ -86,6 +89,7 @@ sys-apps/dbus
 sys-apps/eza
 sys-apps/flatpak
 sys-apps/inxi
+sys-apps/ripgrep
 sys-apps/ugrep
 sys-boot/efibootmgr
 sys-boot/grub
@@ -121,3 +125,4 @@ x11-terms/kitty
 x11-terms/wezterm
 x11-themes/gtk-engines-murrine
 x11-themes/kvantum
+xfce-base/thunar
