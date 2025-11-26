@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+# Set defaults
+#
+#export DOTS_VERSION="v2.3.17-gentoo"
+export EDITOR="nvim"
+export VISUAL="nvim"
+
+alias v=$EDITOR
+alias vi=$EDITOR
+alias vim=$EDITOR
+alias c="clear"
+
+function yy() {
+  local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+  yazi "$@" --cwd-file="$tmp"
+  if cwd="$(cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+    cd -- "$cwd"
+  fi
+  rm -f -- "$tmp"
+
+}
+
+# Goes up a specified number of directories  (i.e. up 4)
+up() {
+  local d=""
+  limit=$1
+  for ((i = 1; i <= limit; i++)); do
+    d=$d/..
+  done
+  d=$(echo $d | sed 's/^\///')
+  if [ -z "$d" ]; then
+    d=..
+  fi
+  cd $d
+}
+
+## Useful aliases
+
+# Replace ls with eza
+alias ls='eza -al --color=always --group-directories-first --icons'                 # preferred listing
+alias la='eza -a --color=always --group-directories-first --icons'                  # all files and dirs
+alias ll='eza -al --color=always --group-directories-first --icons'                 # long format
+alias lt='eza -aT --color=always --group-directories-first --icons'                 # tree listing
+alias l.='eza -ald --color=always --group-directories-first --icons .*'             # show only dotfiles
+alias d='eza -a --grid --header --color=always --group-directories-first --icons'   # long format
+alias dir='eza -a --grid --header --color=always --group-directories-first --icons' # long format
+
+# My personal ones
+#
+alias hostname="echo $(hostnamectl hostname)"
+alias shutdown='systemctl poweroff'
+alias wget='wget -c '
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias grep='ugrep --color=auto'
+alias fgrep='ugrep -F --color=auto'
+alias egrep='ugrep -E --color=auto'
+alias hw='hwinfo --short' # Hardware Info
+alias ip='ip -color'
+alias jctl="journalctl -p 3 -xb"
+alias notes='$EDITOR ~/notes.txt'
+
+export PATH="$HOME/.local/bin/:$PATH"
+#export PATH="$HOME/.local/bin/:$PATH:$HOME/.cargo/bin"
+
+eval "$(starship init bash)"
+eval "$(zoxide init bash)"
