@@ -9,7 +9,7 @@ set -euo pipefail
 # - Writes a post-update markdown report: Post-Update-<DATE>-Report.md
 #
 # Usage:
-#   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--auto-yes] [--help]
+#   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--help]
 #
 # Modes (choose one):
 #   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
@@ -18,6 +18,7 @@ set -euo pipefail
 #
 # Options:
 #   --no-sync     Do not run emerge --sync first.
+#   --use-binpkgs Try to use binary packages from PORTAGE_BINHOST (see make.conf).
 #   --auto-yes    Proceed with updates without interactive prompt (omit --ask).
 #   --help        Show this help and exit.
 #
@@ -36,7 +37,7 @@ say() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
 print_usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--auto-yes] [--help]
+  bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--help]
 
 Modes (choose one):
   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
@@ -45,13 +46,14 @@ Modes (choose one):
 
 Options:
   --no-sync     Do not run emerge --sync first.
+  --use-binpkgs Try to use binary packages from PORTAGE_BINHOST (see make.conf).
   --auto-yes    Proceed with updates without interactive prompt (omit --ask).
   --help        Show this help and exit.
 
 Examples:
   bash scripts/update.sh --eval
   bash scripts/update.sh --dry-run --no-sync
-  bash scripts/update.sh --apply --auto-yes
+  bash scripts/update.sh --apply --use-binpkgs --auto-yes
 EOF
 }
 
@@ -66,7 +68,7 @@ need_root() {
   
   if [ "$need_sudo" = "true" ]; then
     [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
-    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" bash "$0" "$@"
+    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" USE_BINPKGS="${USE_BINPKGS:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" bash "$0" "$@"
   fi
 }
 
@@ -75,6 +77,7 @@ DRY_RUN="false"
 EVAL_ONLY="false"
 APPLY="false"
 NO_SYNC="false"
+USE_BINPKGS="false"
 AUTO_YES="false"
 args=()
 for a in "$@"; do
@@ -83,6 +86,7 @@ for a in "$@"; do
     --eval) EVAL_ONLY="true" ;;
     --apply) APPLY="true" ;;
     --no-sync) NO_SYNC="true" ;;
+    --use-binpkgs) USE_BINPKGS="true" ;;
     --auto-yes) AUTO_YES="true" ;;
     --help|-h) print_usage; exit 0 ;;
     *) args+=("$a") ;;
@@ -98,6 +102,7 @@ fi
 # Common emerge flags
 EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --color=n @world)
 EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y @world)
+[ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg) && EMERGE_UPDATE+=(--getbinpkg)
 [ "$AUTO_YES" = "true" ] || EMERGE_UPDATE=(--ask "${EMERGE_UPDATE[@]}")
 
 # Ensure repo root exists
