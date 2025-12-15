@@ -56,8 +56,15 @@ EOF
 }
 
 need_root() {
-  # Only escalate when actually applying changes
+  # Escalate when applying changes or when syncing in --eval/--dry-run modes
+  local need_sudo=false
   if [ "${APPLY:-false}" = "true" ]; then
+    need_sudo=true
+  elif [ "${NO_SYNC:-false}" = "false" ] && ([ "${EVAL_ONLY:-false}" = "true" ] || [ "${DRY_RUN:-false}" = "true" ]); then
+    need_sudo=true
+  fi
+  
+  if [ "$need_sudo" = "true" ]; then
     [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
     exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" bash "$0" "$@"
   fi
@@ -99,10 +106,24 @@ mkdir -p "$log_dir"
 # Sync Portage unless disabled
 maybe_sync() {
   if [ "$NO_SYNC" = "true" ]; then
-    say "Skipping emerge --sync (per --no-sync)"
+    say "Skipping repository sync (per --no-sync)"
+    return
+  fi
+  
+  if command -v emaint >/dev/null 2>&1; then
+    say "Syncing all repos (emaint sync -a)..."
+    emaint sync -a
   else
     say "Syncing Portage tree (emerge --sync)..."
     emerge --sync
+  fi
+}
+
+# Update eix cache if available
+maybe_update_eix() {
+  if command -v eix-update >/dev/null 2>&1; then
+    say "Refreshing eix cache (eix-update)..."
+    eix-update || true
   fi
 }
 
@@ -194,13 +215,12 @@ write_post_update_report() {
 }
 
 main() {
-  # For actual updates, ensure we have root
-  if [ "$APPLY" = "true" ]; then
-    need_root update "$@"
-  fi
+  # Ensure we have root when needed (apply mode or sync in eval/dry-run)
+  need_root update "$@"
 
   # Sync if requested/default (only when a mode was selected)
   maybe_sync
+  maybe_update_eix
 
   say "Evaluating pending updates (pretend)..."
   if ! emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1; then
