@@ -84,7 +84,8 @@ install_pkg() {
 }
 
 install_list() {
-  local label="$1"; shift
+  local label="$1"
+  shift
   local pkgs=("$@")
   echo "[INFO] Installing ${label} (${#pkgs[@]} items)"
   for pkg in "${pkgs[@]}"; do
@@ -118,7 +119,7 @@ configure_ly() {
   # Force matrix animation and enable big clock
   if [[ -f /etc/ly/config.ini ]]; then
     sudo sed -i -e 's/^animation *=.*/animation = matrix/' \
-                -e 's/^bigclock *=.*/bigclock = true/' /etc/ly/config.ini
+      -e 's/^bigclock *=.*/bigclock = true/' /etc/ly/config.ini
   fi
 
   sudo rc-update add ly default || true
@@ -152,6 +153,7 @@ HYPR_PACKAGES=(
   gui-apps/wl-clipboard
   gui-apps/matugen
   app-misc/app2unit
+  app-misc/ranger
   gui-libs/hyprland-qtutils
   xfce-base/thunar
   x11-misc/wallust
