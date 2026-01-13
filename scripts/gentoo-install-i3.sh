@@ -85,6 +85,7 @@ copy_file() {
 configure_ly() {
   echo "[INFO] Ensuring ly login manager and configuration"
   install_pkg x11-misc/ly
+  install_pkg app-misc/cmatrix
 
   copy_file "${DDUBS_ROOT}/system/etc/init.d/ly" "/etc/init.d/ly" 755
   copy_file "${DDUBS_ROOT}/system/etc/ly/config.ini" "/etc/ly/config.ini" 644
@@ -99,6 +100,18 @@ configure_ly() {
 
   sudo rc-update add ly default || true
   sudo rc-service ly restart || true
+}
+
+configure_gtk_dark_theme() {
+  echo "[INFO] Setting GTK to prefer dark theme for current user"
+  mkdir -p "${HOME}/.config/gtk-3.0" "${HOME}/.config/gtk-4.0"
+  cat > "${HOME}/.config/gtk-3.0/settings.ini" << 'EOF'
+[Settings]
+gtk-theme-name=Adwaita-dark
+gtk-application-prefer-dark-theme=1
+gtk-icon-theme-name=Adwaita
+EOF
+  cp "${HOME}/.config/gtk-3.0/settings.ini" "${HOME}/.config/gtk-4.0/settings.ini"
 }
 
 I3_PACKAGES=(
@@ -189,5 +202,6 @@ install_list "i3 stack" "${I3_PACKAGES[@]}"
 install_list "Fonts" "${FONTS[@]}"
 
 configure_ly
+configure_gtk_dark_theme
 
 echo "[DONE] i3 environment packages and ly login manager ready."
