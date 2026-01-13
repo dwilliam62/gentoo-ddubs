@@ -39,6 +39,17 @@ dev-cpp/gtkmm:3.0 wayland X
 # cairo / cairomm for GTK/Waybar
 >=x11-libs/cairo-1.18.4 X svg
 >=dev-cpp/cairomm-1.14.5:0 X
+# Thunar requires libxfce4ui with either wayland or X
+>=xfce-base/libxfce4ui-4.20.2 wayland
+# XFCE stack for Thunar + panel on Wayland
+>=xfce-base/libxfce4windowing-4.20.5 wayland
+>=xfce-base/xfce4-panel-4.20.6 wayland dbusmenu
+>=xfce-base/exo-4.20.0 wayland
+>=xfce-base/thunar-4.20.6 wayland
+>=xfce-base/tumbler-4.20.1 wayland
+# Panel deps
+>=app-crypt/gcr-3.41.2 wayland
+dev-libs/libdbusmenu gtk3
 # swaync (GTK4) requirements
 >=gui-libs/gtk-4.20.3-r2 wayland
 >=gui-libs/gtk4-layer-shell-1.1.1-r1 vala introspection
@@ -156,6 +167,13 @@ HYPR_PACKAGES=(
   app-misc/ranger
   gui-libs/hyprland-qtutils
   xfce-base/thunar
+  xfce-base/tumbler
+  xfce-base/xfce4-panel
+  xfce-base/libxfce4windowing
+  xfce-base/libxfce4ui
+  xfce-base/exo
+  dev-libs/libdbusmenu
+  app-crypt/gcr
   x11-misc/wallust
   x11-misc/xdg-user-dirs
   x11-terms/kitty
