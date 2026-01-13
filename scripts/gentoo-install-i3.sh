@@ -30,6 +30,10 @@ x11-libs/libxkbcommon wayland
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 >=sys-apps/systemd-259 policykit
 >=dev-qt/qtdeclarative-6.10.1 opengl
+media-video/pipewire pulseaudio
+media-libs/libcanberra alsa pulseaudio
+>=media-libs/libpulse-17.0 X
+>=x11-libs/cairo-1.18.4-r1 -X
 EOF
 }
 ensure_video_cards() {
@@ -139,9 +143,19 @@ I3_PACKAGES=(
   x11-misc/qt5ct
   app-misc/nwg-look
   media-video/pipewire
+  media-video/pipewire-pulse
+  media-video/wireplumber
+  media-libs/alsa-lib
+  media-sound/alsa-utils
   media-sound/pavucontrol
   media-sound/pamixer
   media-sound/playerctl
+  media-sound/pwvucontrol
+  media-libs/libcanberra
+  sys-auth/rtkit
+  net-wireless/bluez
+  net-wireless/bluez-utils
+  net-wireless/bluez-tools
   media-video/mpv
   net-misc/networkmanager
   app-misc/fastfetch

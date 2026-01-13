@@ -50,6 +50,11 @@ dev-cpp/gtkmm:3.0 wayland X
 # Panel deps
 >=app-crypt/gcr-3.41.2 wayland
 dev-libs/libdbusmenu gtk3
+# PipeWire audio stack
+media-video/pipewire pulseaudio
+media-libs/libcanberra alsa pulseaudio
+>=media-libs/libpulse-17.0 X
+>=x11-libs/cairo-1.18.4-r1 -X
 # swaync (GTK4) requirements
 >=gui-libs/gtk-4.20.3-r2 wayland
 >=gui-libs/gtk4-layer-shell-1.1.1-r1 vala introspection
@@ -191,9 +196,19 @@ HYPR_PACKAGES=(
   media-libs/mesa
   x11-libs/libdrm
   media-video/pipewire
+  media-video/pipewire-pulse
+  media-video/wireplumber
+  media-libs/alsa-lib
+  media-sound/alsa-utils
   media-sound/pavucontrol
   media-sound/pamixer
   media-sound/playerctl
+  media-sound/pwvucontrol
+  media-libs/libcanberra
+  sys-auth/rtkit
+  net-wireless/bluez
+  net-wireless/bluez-utils
+  net-wireless/bluez-tools
   media-video/mpv
   net-misc/networkmanager
   app-misc/fastfetch
