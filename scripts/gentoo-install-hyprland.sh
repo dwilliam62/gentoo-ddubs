@@ -27,7 +27,7 @@ ensure_use_flags() {
   local use_file="/etc/portage/package.use/hyprland-qt"
   sudo mkdir -p /etc/portage/package.use
   sudo tee "$use_file" >/dev/null <<'EOF'
->=dev-qt/qtbase-6.10.1 wayland opengl
+>=dev-qt/qtbase-6.10.1 wayland opengl icu
 dev-qt/qtwayland wayland opengl
 >=dev-qt/qtdeclarative-6.10.1 opengl
  x11-libs/libxkbcommon X wayland
@@ -155,6 +155,26 @@ EOF
   cp "${HOME}/.config/gtk-3.0/settings.ini" "${HOME}/.config/gtk-4.0/settings.ini"
 }
 
+ensure_gentoo_rsync_repo() {
+  echo "[INFO] Configuring Gentoo main repo to use rsync"
+  local repo_conf_dir="/etc/portage/repos.conf"
+  local gentoo_conf="${repo_conf_dir}/gentoo.conf"
+
+  sudo mkdir -p "${repo_conf_dir}"
+  sudo tee "${gentoo_conf}" >/dev/null <<'EOF'
+[gentoo]
+location = /var/db/repos/gentoo
+sync-type = rsync
+sync-uri = rsync://rsync.gentoo.org/gentoo-portage
+auto-sync = yes
+EOF
+
+  if [ -d /var/db/repos/gentoo ]; then
+    echo "[INFO] Removing any git metadata from /var/db/repos/gentoo for rsync"
+    sudo find /var/db/repos/gentoo -maxdepth 1 -name '.git*' -exec rm -rf {} +
+  fi
+}
+
 HYPR_PACKAGES=(
   gui-wm/hyprland
   gui-apps/hypridle
@@ -247,10 +267,37 @@ FONTS=(
   media-fonts/urw-fonts
 )
 
+SET_DARK_ONLY=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --set-dark)
+      SET_DARK_ONLY=1
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: $0 [--set-dark]"
+      echo "  --set-dark   Only configure GTK dark theme for current user and exit."
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$SET_DARK_ONLY" -eq 1 ]]; then
+  configure_gtk_dark_theme
+  echo "[DONE] GTK dark theme configured."
+  exit 0
+fi
+
 echo "[INFO] Starting Gentoo Hyprland package installation"
 ensure_use_flags
 ensure_unmask_hypr_qtutils
 ensure_video_cards
+ensure_gentoo_rsync_repo
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 install_list "Fonts" "${FONTS[@]}"
 
