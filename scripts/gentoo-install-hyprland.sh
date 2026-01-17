@@ -73,15 +73,28 @@ gui-libs/hyprland-qtutils
 EOF
 }
 ensure_video_cards() {
-  echo "[INFO] Ensuring VIDEO_CARDS includes virgl for virtual GPUs"
+  echo "[INFO] Ensuring VIDEO_CARDS includes virgl and detecting hardware..."
   local mc="/etc/portage/make.conf"
   sudo touch "$mc"
+
+  # Default to virgl for your current VM setup
+  local cards="virgl"
+
+  # Detection logic for future HW moves
+  if lspci | grep -qi "nvidia"; then
+    cards="$cards nvidia"
+  elif lspci | grep -qi "amd"; then
+    cards="$cards amdgpu radeonsi"
+  elif lspci | grep -qi "intel"; then
+    cards="$cards intel i915"
+  fi
+
+  # Update make.conf if the line exists, otherwise append
   if grep -q '^VIDEO_CARDS=' "$mc"; then
-    if ! grep -q 'virgl' "$mc"; then
-      sudo sed -i 's/^VIDEO_CARDS=\"\?\(.*\)\"\?$/VIDEO_CARDS=\"\1 virgl\"/' "$mc"
-    fi
+    # This replaces the line entirely with our detected list
+    sudo sed -i "s/^VIDEO_CARDS=.*/VIDEO_CARDS=\"$cards\"/" "$mc"
   else
-    echo 'VIDEO_CARDS="virgl"' | sudo tee -a "$mc" >/dev/null
+    echo "VIDEO_CARDS=\"$cards\"" | sudo tee -a "$mc" >/dev/null
   fi
 }
 
@@ -120,17 +133,15 @@ copy_file() {
 }
 
 configure_ly() {
-  echo "[INFO] Ensuring ly login manager and configuration"
+  echo "[INFO] Ensuring ly login manager and configuration (systemd)"
   install_pkg x11-misc/ly
   install_pkg app-misc/cmatrix
 
-  copy_file "${DDUBS_ROOT}/system/etc/init.d/ly" "/etc/init.d/ly" 755
+  # Deploy config files from your ddubs repo
   copy_file "${DDUBS_ROOT}/system/etc/ly/config.ini" "/etc/ly/config.ini" 644
   copy_file "${DDUBS_ROOT}/system/etc/ly/wsetup.sh" "/etc/ly/wsetup.sh" 755
   copy_file "${DDUBS_ROOT}/system/etc/ly/xsetup.sh" "/etc/ly/xsetup.sh" 755
   copy_file "${DDUBS_ROOT}/system/etc/pam.d/ly" "/etc/pam.d/ly" 644
-
-  # Also ship hyprlock PAM config from the repo, if present
   copy_file "${DDUBS_ROOT}/system/etc/pam.d/hyprlock" "/etc/pam.d/hyprlock" 644
 
   # Force matrix animation and enable big clock
@@ -139,14 +150,15 @@ configure_ly() {
       -e 's/^bigclock *=.*/bigclock = true/' /etc/ly/config.ini
   fi
 
-  sudo rc-update add ly default || true
-  sudo rc-service ly restart || true
+  # Enable the service via systemd
+  echo "[INFO] Enabling ly.service via systemd"
+  sudo systemctl enable ly.service
 }
 
 configure_gtk_dark_theme() {
   echo "[INFO] Setting GTK to prefer dark theme for current user"
   mkdir -p "${HOME}/.config/gtk-3.0" "${HOME}/.config/gtk-4.0"
-  cat > "${HOME}/.config/gtk-3.0/settings.ini" << 'EOF'
+  cat >"${HOME}/.config/gtk-3.0/settings.ini" <<'EOF'
 [Settings]
 gtk-theme-name=Adwaita-dark
 gtk-application-prefer-dark-theme=1
@@ -271,19 +283,19 @@ SET_DARK_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --set-dark)
-      SET_DARK_ONLY=1
-      shift
-      ;;
-    -h|--help)
-      echo "Usage: $0 [--set-dark]"
-      echo "  --set-dark   Only configure GTK dark theme for current user and exit."
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      exit 1
-      ;;
+  --set-dark)
+    SET_DARK_ONLY=1
+    shift
+    ;;
+  -h | --help)
+    echo "Usage: $0 [--set-dark]"
+    echo "  --set-dark   Only configure GTK dark theme for current user and exit."
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
   esac
 done
 
