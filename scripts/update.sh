@@ -285,6 +285,10 @@ main() {
     say "Running depclean (safe, asks by default)"
     emerge --ask --depclean || true
   fi
+  if command -v eclean-dist >/dev/null 2>&1; then
+    say "Cleaning old distfiles (eclean-dist -d)"
+    eclean-dist -d || true
+  fi
 
   # Post report
   write_post_update_report
