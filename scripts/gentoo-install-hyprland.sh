@@ -235,7 +235,7 @@ HYPR_PACKAGES=(
   gui-apps/nwg-displays
   gui-apps/quickshell
   gui-apps/nwg-drawer
-  gui-apps/nwg-look
+  app-misc/nwg-look
   gui-apps/wlr-randr
   gui-apps/wl-clipboard
   gui-apps/matugen
