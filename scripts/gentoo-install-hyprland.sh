@@ -58,6 +58,8 @@ media-libs/libcanberra alsa pulseaudio
 # swaync (GTK4) requirements
 >=gui-libs/gtk-4.20.3-r2 wayland
 >=gui-libs/gtk4-layer-shell-1.1.1-r1 vala introspection
+# legacy GTK3 layer-shell helper
+gui-libs/gtk-layer-shell introspection
 # kitty Wayland build
 x11-terms/kitty wayland
 # mpv/vlc dependency
