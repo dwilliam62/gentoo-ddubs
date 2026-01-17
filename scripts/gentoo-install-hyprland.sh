@@ -102,6 +102,25 @@ pkg_installed() {
   equery -q list "$1" >/dev/null 2>&1
 }
 
+prebuild_problematic_binaries() {
+  local problematic=(
+    "sci-libs/fftw"
+    "sci-libs/openblas"
+    "sci-libs/flexiblas"
+  )
+
+  echo "[INFO] Pre-building problematic math libraries from source to avoid Python async bugs..."
+  for pkg in "${problematic[@]}"; do
+    if ! equery list "$pkg" >/dev/null 2>&1; then
+      echo "[INFO] Forcing source build for $pkg..."
+      # --usepkg=n is the magic flag that ignores the buggy binaries
+      sudo emerge -v --ask=n --usepkg=n "$pkg"
+    else
+      echo "[INFO] $pkg is already installed, skipping."
+    fi
+  done
+}
+
 install_pkg() {
   local pkg="$1"
   if pkg_installed "$pkg"; then
@@ -310,6 +329,7 @@ ensure_use_flags
 ensure_unmask_hypr_qtutils
 ensure_video_cards
 ensure_gentoo_rsync_repo
+prebuild_problematic_binaries
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 install_list "Fonts" "${FONTS[@]}"
 
