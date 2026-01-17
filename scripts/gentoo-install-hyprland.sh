@@ -175,8 +175,8 @@ copy_file() {
 
 configure_ly() {
   echo "[INFO] Ensuring ly login manager and configuration (systemd)"
-  install_pkg x11-misc/ly
-  install_pkg app-misc/cmatrix
+  install_if_missing x11-misc/ly
+  install_if_missing app-misc/cmatrix
 
   # Deploy config files from your ddubs repo
   copy_file "${DDUBS_ROOT}/system/etc/ly/config.ini" "/etc/ly/config.ini" 644
