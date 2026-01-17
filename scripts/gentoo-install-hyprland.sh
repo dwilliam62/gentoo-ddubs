@@ -104,6 +104,21 @@ pkg_installed() {
   equery -q list "$1" >/dev/null 2>&1
 }
 
+# Generic helper: install a package only if it is not already installed.
+# Uses the same pkg_installed() check as install_pkg, but keeps the call-site
+# simple and avoids re-emerging things on script re-runs when they are
+# already present.
+install_if_missing() {
+  local pkg="$1"
+  if pkg_installed "$pkg"; then
+    echo "[OK] $pkg is already installed, skipping."
+    return 0
+  fi
+
+  echo "[INFO] Installing $pkg (first-time or previously failed build)..."
+  install_pkg "$pkg"
+}
+
 prebuild_problematic_binaries() {
   local problematic=(
     "sci-libs/fftw"
@@ -144,7 +159,7 @@ install_list() {
   local pkgs=("$@")
   echo "[INFO] Installing ${label} (${#pkgs[@]} items)"
   for pkg in "${pkgs[@]}"; do
-    install_pkg "$pkg"
+    install_if_missing "$pkg"
   done
 }
 
