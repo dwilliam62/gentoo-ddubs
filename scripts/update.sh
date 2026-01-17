@@ -209,6 +209,14 @@ write_post_update_report() {
     fi
 
     echo
+    echo "## Kernel Status"
+    current_k=$(uname -r)
+    latest_k=$(ls -t /lib/modules | head -n1)
+    if [ "$current_k" != "$latest_k" ]; then
+      echo "⚠️ Reboot required: Running $current_k, but $latest_k is installed."
+    fi
+
+    echo
     echo "## Remaining Updates"
     echo
     echo '```text'
@@ -272,6 +280,8 @@ main() {
     revdep-rebuild -v || true
   fi
   if command -v emerge >/dev/null 2>&1; then
+    say "Checking for preserved-rebuilds..."
+    emerge @preserved-rebuild --quiet || true
     say "Running depclean (safe, asks by default)"
     emerge --ask --depclean || true
   fi
