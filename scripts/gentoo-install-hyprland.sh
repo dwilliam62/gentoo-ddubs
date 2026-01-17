@@ -125,9 +125,14 @@ install_pkg() {
   local pkg="$1"
   if pkg_installed "$pkg"; then
     echo "[OK] $pkg already installed"
-  else
-    echo "[INFO] Installing $pkg ..."
-    sudo emerge -v --ask=n "$pkg"
+    return 0
+  fi
+
+  echo "[INFO] Installing $pkg ..."
+  # Attempt normal install (uses binpkgs if available)
+  if ! sudo emerge -v --ask=n "$pkg"; then
+    echo "[WARNING] $pkg failed with binpkg. Retrying from source..."
+    sudo emerge -v --ask=n --usepkg=n "$pkg"
   fi
 }
 
