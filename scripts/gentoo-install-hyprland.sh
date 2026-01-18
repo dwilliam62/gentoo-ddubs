@@ -181,6 +181,54 @@ install_list() {
   done
 }
 
+# Build and install hyprland-qtutils from source if not already present.
+# This is needed because gui-libs/hyprland-qtutils is not yet available in
+# the main Gentoo tree. We clone upstream, build with CMake, and install.
+# On success, the temporary build directory is removed.
+build_hyprland_qtutils() {
+  echo "[INFO] Ensuring hyprland-qtutils is installed from source"
+
+  if command -v hyprland-qtutils >/dev/null 2>&1; then
+    echo "[OK] hyprland-qtutils already present in PATH, skipping source build."
+    return 0
+  fi
+
+  require_cmd git
+  require_cmd cmake
+
+  local workdir
+  workdir=$(mktemp -d -t hyprland-qtutils-XXXXXX) || {
+    echo "[ERROR] Failed to create temporary directory for hyprland-qtutils build" >&2
+    return 1
+  }
+
+  echo "[INFO] Using temporary build directory: $workdir"
+
+  if ! (
+    set -e
+    cd "$workdir"
+    echo "[INFO] Cloning hyprwm/hyprland-qtutils..."
+    git clone https://github.com/hyprwm/hyprland-qtutils.git .
+    echo "[INFO] Configuring hyprland-qtutils (CMake Release build)..."
+    cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+    echo "[INFO] Building hyprland-qtutils..."
+    cmake --build build --config Release --target all
+    echo "[INFO] Installing hyprland-qtutils (sudo cmake --install build)..."
+    sudo cmake --install build
+  ); then
+    echo "[ERROR] hyprland-qtutils build or install failed; leaving sources in $workdir for inspection." >&2
+    return 1
+  fi
+
+  # Verify installation and clean up
+  if command -v hyprland-qtutils >/dev/null 2>&1; then
+    echo "[SUCCESS] hyprland-qtutils installed successfully. Cleaning up $workdir"
+    rm -rf "$workdir" || echo "[WARN] Failed to remove temporary directory $workdir" >&2
+  else
+    echo "[WARN] hyprland-qtutils build finished but binary not found in PATH; keeping $workdir for debugging." >&2
+  fi
+}
+
 copy_file() {
   local src="$1" dst="$2" mode="$3"
   if [[ -f "$src" ]]; then
@@ -373,6 +421,10 @@ ensure_video_cards
 ensure_gentoo_rsync_repo
 prebuild_problematic_binaries
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
+
+# Build hyprland-qtutils from source if needed (not in main Gentoo repo yet)
+build_hyprland_qtutils || echo "[WARN] hyprland-qtutils build failed; continuing without it."
+
 install_list "Fonts" "${FONTS[@]}"
 
 configure_ly
