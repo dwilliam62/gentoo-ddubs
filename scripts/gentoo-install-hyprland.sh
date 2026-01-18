@@ -43,7 +43,10 @@ dev-cpp/gtkmm:3.0 wayland X
 >=x11-libs/gtk+-3.24.51 wayland X
 >=media-libs/mesa-25.3.3 wayland
 # cairo / cairomm for GTK/Waybar
->=x11-libs/cairo-1.18.4 X svg
+# Align with Portage suggestion to resolve slot collision:
+#   - x11-libs/cairo-1.18.4-r1 (Change USE: +X +aqua)
+#   - dev-cpp/cairomm-1.18.0 (Change USE: +X)
+>=x11-libs/cairo-1.18.4-r1 X aqua svg
 >=dev-cpp/cairomm-1.14.5:0 X
 # Thunar requires libxfce4ui with either wayland or X
 >=xfce-base/libxfce4ui-4.20.2 wayland
@@ -60,7 +63,6 @@ dev-libs/libdbusmenu gtk3
 media-video/pipewire pulseaudio
 media-libs/libcanberra alsa pulseaudio
 >=media-libs/libpulse-17.0 X
->=x11-libs/cairo-1.18.4-r1 -X
 # swaync (GTK4) requirements
 >=gui-libs/gtk-4.20.3-r2 wayland
 >=gui-libs/gtk4-layer-shell-1.1.1-r1 vala introspection
