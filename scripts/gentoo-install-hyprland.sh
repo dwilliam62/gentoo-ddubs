@@ -61,9 +61,9 @@ dev-cpp/gtkmm:3.0 wayland X
 >=app-crypt/gcr-3.41.2 wayland
 dev-libs/libdbusmenu gtk3
 # PipeWire audio stack
-media-video/pipewire pulseaudio
+media-video/pipewire pulseaudio sound-server extra alsa-pipewire
 media-libs/libcanberra alsa pulseaudio
->=media-libs/libpulse-17.0 X
+>=media-libs/libpulse-17.0 X glib
 # swaync (GTK4) requirements
 >=gui-libs/gtk-4.20.3-r2 wayland
 >=gui-libs/gtk4-layer-shell-1.1.1-r1 vala introspection
@@ -315,6 +315,29 @@ EOF
   fi
 }
 
+ensure_pamixer_cxx17_fix() {
+  echo "[INFO] Ensuring C++17 fix for media-sound/pamixer (Portage env)"
+
+  # Create the directory if it doesn't exist
+  sudo mkdir -p /etc/portage/env
+
+  # Write the flag to a dedicated environment file (idempotent overwrite)
+  sudo tee /etc/portage/env/cxx17-fix >/dev/null <<'EOF'
+CXXFLAGS="${CXXFLAGS} -std=c++17"
+EOF
+
+  # Create the package.env directory if needed
+  sudo mkdir -p /etc/portage/package.env
+
+  # Link pamixer to the fix, but avoid duplicating the line on re-runs
+  local pamixer_env="/etc/portage/package.env/pamixer"
+  if [[ -f "${pamixer_env}" ]] && grep -q 'media-sound/pamixer' "${pamixer_env}"; then
+    echo "[INFO] pamixer package.env entry already present; leaving as-is."
+  else
+    echo "media-sound/pamixer cxx17-fix" | sudo tee -a "${pamixer_env}" >/dev/null
+  fi
+}
+
 HYPR_PACKAGES=(
   app-crypt/gcr
   # app-misc/app2unit   # need find source for this
@@ -360,9 +383,7 @@ HYPR_PACKAGES=(
   media-libs/mesa
   media-sound/alsa-utils
   media-sound/pavucontrol
-  # media-sound/pamixer
-  #   2026-01-18: Temporarily disabled.
-  #   Fails to build (ICU / C++14 mismatch in /usr/include/unicode/unistr.h; needs ebuild/overlay fix).
+  media-sound/pamixer  # C++17 env fix applied via ensure_pamixer_cxx17_fix
   media-sound/playerctl
   media-sound/pavucontrol
   media-libs/libcanberra
@@ -441,6 +462,7 @@ ensure_use_flags
 # ensure_unmask_hypr_qtutils  # disabled until gui-libs/hyprland-qtutils lands in main Gentoo repo
 ensure_video_cards
 ensure_gentoo_rsync_repo
+ensure_pamixer_cxx17_fix
 prebuild_problematic_binaries
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 
