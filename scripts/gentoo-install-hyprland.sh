@@ -148,17 +148,24 @@ prebuild_problematic_binaries() {
 
 install_pkg() {
   local pkg="$1"
-  if pkg_installed "$pkg"; then
-    echo "[OK] $pkg already installed"
+
+  echo "[INFO] Installing $pkg ..."
+
+  # First attempt: auto-fix typical config/USE issues and respect binpkg USE
+  if sudo emerge --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y "$pkg"; then
+    echo "[SUCCESS] $pkg installed."
     return 0
   fi
 
-  echo "[INFO] Installing $pkg ..."
-  # Attempt normal install (uses binpkgs if available)
-  if ! sudo emerge -v --ask=n "$pkg"; then
-    echo "[WARNING] $pkg failed with binpkg. Retrying from source..."
-    sudo emerge -v --ask=n --usepkg=n "$pkg"
+  # If that failed, try to auto-apply pending config updates, then retry once
+  echo "[RETRY] Applying Portage config changes and retrying $pkg..."
+  if command -v etc-update >/dev/null 2>&1; then
+    echo -e "-5\ny" | sudo etc-update > /dev/null || true
+  else
+    echo "[WARN] etc-update not found; skipping automatic config merge."
   fi
+
+  sudo emerge --ask=n --oneshot "$pkg"
 }
 
 install_list() {
