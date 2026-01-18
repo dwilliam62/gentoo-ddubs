@@ -22,6 +22,12 @@ if ! command -v equery >/dev/null 2>&1; then
   sudo emerge -v --ask=n app-portage/gentoolkit
 fi
 
+# Ensure qlist (portage-utils) is available for fast installed-package checks
+if ! command -v qlist >/dev/null 2>&1; then
+  echo "[INFO] Installing app-portage/portage-utils for qlist..."
+  sudo emerge -v --ask=n app-portage/portage-utils
+fi
+
 ensure_use_flags() {
   echo "[INFO] Ensuring required USE flags for qtbase, libxkbcommon, gtkmm, gtk+, cairo/mesa"
   local use_file="/etc/portage/package.use/hyprland-qt"
@@ -101,7 +107,9 @@ ensure_video_cards() {
 }
 
 pkg_installed() {
-  equery -q list "$1" >/dev/null 2>&1
+  # Use qlist -I (from app-portage/portage-utils) for fast membership checks
+  # Expects a full category/atom like gui-wm/hyprland.
+  qlist -I "$1" >/dev/null 2>&1
 }
 
 # Generic helper: install a package only if it is not already installed.
@@ -128,7 +136,7 @@ prebuild_problematic_binaries() {
 
   echo "[INFO] Pre-building problematic math libraries from source to avoid Python async bugs..."
   for pkg in "${problematic[@]}"; do
-    if ! equery list "$pkg" >/dev/null 2>&1; then
+    if ! qlist -I "$pkg" >/dev/null 2>&1; then
       echo "[INFO] Forcing source build for $pkg..."
       # --usepkg=n is the magic flag that ignores the buggy binaries
       sudo emerge -v --ask=n --usepkg=n "$pkg"
