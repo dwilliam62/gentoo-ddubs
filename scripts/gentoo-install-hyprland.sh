@@ -4,7 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-DDUBS_ROOT="$(realpath "${SCRIPT_DIR}/../gentoo-ddubs")"
+# Repo root (one level above scripts/)
+DDUBS_ROOT="$(realpath "${SCRIPT_DIR}/..")"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
