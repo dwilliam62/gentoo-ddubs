@@ -72,14 +72,14 @@ x11-terms/kitty wayland
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
 }
-ensure_unmask_hypr_qtutils() {
-  echo "[INFO] Unmasking gui-libs/hyprland-qtutils (temporarily masked upstream)"
-  local unmask_file="/etc/portage/package.unmask/hyprland-qtutils"
-  sudo mkdir -p /etc/portage/package.unmask
-  sudo tee "$unmask_file" >/dev/null <<'EOF'
-gui-libs/hyprland-qtutils
-EOF
-}
+# ensure_unmask_hypr_qtutils() {
+#   echo "[INFO] Unmasking gui-libs/hyprland-qtutils (temporarily masked upstream)"
+#   local unmask_file="/etc/portage/package.unmask/hyprland-qtutils"
+#   sudo mkdir -p /etc/portage/package.unmask
+#   sudo tee "$unmask_file" >/dev/null <<'EOF'
+# gui-libs/hyprland-qtutils
+# EOF
+# }
 ensure_video_cards() {
   echo "[INFO] Ensuring VIDEO_CARDS includes virgl and detecting hardware..."
   local mc="/etc/portage/make.conf"
@@ -244,6 +244,7 @@ HYPR_PACKAGES=(
   gui-apps/hyprshot
   gui-libs/hyprcursor
   gui-libs/xdg-desktop-portal-hyprland
+  gui-libs/hyprland-qt-support
   gui-apps/waybar
   gui-apps/wlogout
   gui-apps/wofi
@@ -356,7 +357,7 @@ fi
 
 echo "[INFO] Starting Gentoo Hyprland package installation"
 ensure_use_flags
-ensure_unmask_hypr_qtutils
+# ensure_unmask_hypr_qtutils  # disabled until gui-libs/hyprland-qtutils lands in main Gentoo repo
 ensure_video_cards
 ensure_gentoo_rsync_repo
 prebuild_problematic_binaries
