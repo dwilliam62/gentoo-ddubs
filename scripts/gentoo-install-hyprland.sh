@@ -313,7 +313,6 @@ HYPR_PACKAGES=(
   media-libs/libcanberra
   sys-auth/rtkit
   net-wireless/bluez
-  net-wireless/bluez-utils
   net-wireless/bluez-tools
   media-video/mpv
   net-misc/networkmanager
