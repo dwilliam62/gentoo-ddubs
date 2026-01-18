@@ -261,7 +261,7 @@ HYPR_PACKAGES=(
   app-misc/nwg-look
   gui-apps/wlr-randr
   gui-apps/wl-clipboard
-  gui-apps/matugen
+  x11-misc/matugen
   app-misc/app2unit
   app-misc/ranger
   gui-libs/hyprland-qtutils
