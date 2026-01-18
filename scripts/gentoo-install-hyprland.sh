@@ -320,6 +320,7 @@ HYPR_PACKAGES=(
   gui-apps/slurp
   gui-apps/swappy
   gui-apps/swaync
+  gui-apps/uwsm
   gui-apps/waybar
   gui-apps/wlogout
   gui-apps/wofi
