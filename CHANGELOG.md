@@ -2,7 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2025-1-18
+
+- Major re-do of the script
+  - Walked through process found issues, missing pkgs
+  - Wrong package names, conflicting USE flags
+  - Added post install script `post-install-cleanup.sh`
+  - Updted hyprland dotfiles to v2.3.19-dev
+  - Added `install-bugsvim.sh` script
+    - clones and installs `bugsvim` Neovim config
+    - Disabled `dev-lang/rust` and `llvim-core/clang`
+      - Both are long builds
+      - Nodejs is still there also a large build
+  - Added `uwsm` package as `hyprland-uwsm` is default
+    - In case someone leaves it at that and tries to login
+  - Added `quickshell` package
+  - Added solo script to build `hyprland-qtutils` from source
+    - Gentoo does not have it in any repo I could find
+  - Disabled `pamixer` as it won't build waiting for upstream fix
+    - There is a potential workaround but for now leaving as-is
+  - Added functions to the script to try to resolve common issues
+    - slot conficts
+    - USE flag autounmasking
+    - If binary emerge fails switch to source build
+    - `equery` wasn't detecting installed packages
+      - Causing all packages to be rebuilt every time script ran
+      - Switch to `qlist -I` faster, and works
+    ```bash
+     install_if_missing() {
+         local pkg=$1
+         if ! qlist -I "$pkg" > /dev/null 2>&1; then
+             echo ">>> Installing $pkg..."
+             sudo emerge --ask=n --verbose --oneshot "$pkg"
+         else
+             echo ">>> $pkg is already installed, skipping."
+         fi
+     }
+    ```
+  - Added check to suggest reboot and deep clean rebuild pkgs
+  - Added "prebuild problem packages" function to fix python failures
+  - Added script to fix gentoo default cursor issue in HL
+    - Need to integrate into install script
+  - Added Backup script for gentoo config
+  - Added `--set-dark` flag set GTK themes to `Aiwaita-Dark`
+
 ## 2025-11-05
+
 - Initial repository: imported Gentoo system snapshot (Portage configs, world, fstab, locale, kernel .config) and system metadata.
 - Added dotfiles captured from VM: Hyprland, suckless (dunst, picom, rofi, sxhkd, scripts), and `~/.dwm/autostart.sh`.
 - Deployment: added `scripts/deploy-dotfiles.sh` (backups, PATH setup, script install to `~/.local/bin`).
