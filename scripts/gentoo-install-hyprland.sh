@@ -327,7 +327,6 @@ HYPR_PACKAGES=(
   gui-apps/wlr-randr
   gui-apps/wl-clipboard
   gui-apps/waypaper
-  app-misc/nwg-look
   gui-libs/hyprcursor
   gui-libs/xdg-desktop-portal-hyprland
   gui-libs/hyprland-qt-support
@@ -356,6 +355,7 @@ HYPR_PACKAGES=(
   sys-apps/eza
   sys-auth/rtkit
   sys-apps/flatpak
+  www-client/google-chrome
   x11-misc/matugen
   x11-misc/rofi
   x11-misc/wallust
