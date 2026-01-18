@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file.
   - Walked through process found issues, missing pkgs
   - Wrong package names, conflicting USE flags
   - Added post install script `post-install-cleanup.sh`
+  - Fixed `pamixer` compile issue
+  - Fixed `pipewire` not starting
+  - Added function to add current user to audio groups
+  - Added function to set proper paths for `pamixer`
+    - Adds them to `~/.zshrc` and/or `~/.bashrc`
+      - Checks to see if already added to them
   - Updted hyprland dotfiles to v2.3.19-dev
   - Added `install-bugsvim.sh` script
     - clones and installs `bugsvim` Neovim config
