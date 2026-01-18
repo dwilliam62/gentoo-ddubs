@@ -188,8 +188,16 @@ install_list() {
 build_hyprland_qtutils() {
   echo "[INFO] Ensuring hyprland-qtutils is installed from source"
 
+  # Prefer binary-on-PATH check if it exists
   if command -v hyprland-qtutils >/dev/null 2>&1; then
     echo "[OK] hyprland-qtutils already present in PATH, skipping source build."
+    return 0
+  fi
+
+  # Fallback: idempotent marker file in case the binary name/location changes
+  local marker="/var/lib/hyprland-qtutils-ddubs/installed"
+  if [[ -f "$marker" ]]; then
+    echo "[OK] hyprland-qtutils previously installed by this script (marker: $marker); skipping source build."
     return 0
   fi
 
@@ -226,6 +234,13 @@ build_hyprland_qtutils() {
     rm -rf "$workdir" || echo "[WARN] Failed to remove temporary directory $workdir" >&2
   else
     echo "[WARN] hyprland-qtutils build finished but binary not found in PATH; keeping $workdir for debugging." >&2
+  fi
+
+  # Record successful install so subsequent runs can skip rebuild even if the
+  # binary name/location changes in the future.
+  if [[ ! -f "$marker" ]]; then
+    sudo mkdir -p "$(dirname "$marker")"
+    sudo touch "$marker"
   fi
 }
 
