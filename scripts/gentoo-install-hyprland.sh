@@ -353,6 +353,50 @@ EOF
   fi
 }
 
+ensure_pipewire_use_fix() {
+  echo "[INFO] Ensuring PipeWire/libpulse USE flags via package.use files"
+
+  sudo mkdir -p /etc/portage/package.use
+
+  local pipewire_use="/etc/portage/package.use/pipewire"
+  local libpulse_use="/etc/portage/package.use/libpulse"
+
+  if [[ -f "${pipewire_use}" ]] && grep -q 'media-video/pipewire' "${pipewire_use}"; then
+    echo "[OK] media-video/pipewire USE flags already present in ${pipewire_use}"
+  else
+    echo 'media-video/pipewire sound-server extra alsa-pipewire' | sudo tee -a "${pipewire_use}" >/dev/null
+  fi
+
+  if [[ -f "${libpulse_use}" ]] && grep -q 'media-libs/libpulse' "${libpulse_use}"; then
+    echo "[OK] media-libs/libpulse USE flags already present in ${libpulse_use}"
+  else
+    echo 'media-libs/libpulse glib' | sudo tee -a "${libpulse_use}" >/dev/null
+  fi
+}
+
+configure_shell_runtime_exports() {
+  echo "[INFO] Ensuring XDG_RUNTIME_DIR and PULSE_SERVER exports in user shell rc files"
+
+  local rc
+  for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+    if [[ -f "$rc" ]]; then
+      if grep -q 'Hyprland audio runtime exports (added by gentoo-install-hyprland.sh)' "$rc"; then
+        echo "[OK] Runtime exports already present in $rc"
+      else
+        {
+          echo ''
+          echo '# Hyprland audio runtime exports (added by gentoo-install-hyprland.sh)'
+          echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"'
+          echo 'export PULSE_SERVER="unix:${XDG_RUNTIME_DIR}/pulse/native"'
+        } >> "$rc"
+        echo "[OK] Added runtime exports to $rc"
+      fi
+    else
+      echo "[INFO] Shell rc file not found: $rc (skipping)"
+    fi
+  done
+}
+
 HYPR_PACKAGES=(
   app-crypt/gcr
   # app-misc/app2unit   # need find source for this
@@ -478,8 +522,10 @@ ensure_use_flags
 ensure_video_cards
 ensure_gentoo_rsync_repo
 ensure_pamixer_cxx17_fix
+ensure_pipewire_use_fix
 prebuild_problematic_binaries
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
+configure_shell_runtime_exports
 
 # Build hyprland-qtutils from source if needed (not in main Gentoo repo yet)
 build_hyprland_qtutils || echo "[WARN] hyprland-qtutils build failed; continuing without it."
