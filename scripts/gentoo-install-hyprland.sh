@@ -262,6 +262,27 @@ configure_ly() {
   sudo systemctl enable ly.service
 }
 
+configure_pipewire() {
+  echo "[INFO] Enabling PipeWire + WirePlumber (systemd user units)"
+
+  if command -v loginctl >/dev/null 2>&1; then
+    echo "[INFO] Enabling systemd user lingering for ${USER} (for user services at boot)"
+    sudo loginctl enable-linger "${USER}" || \
+      echo "[WARN] Failed to enable linger for ${USER}; PipeWire user services will start only after login."
+  fi
+
+  if command -v systemctl >/dev/null 2>&1; then
+    echo "[INFO] Enabling PipeWire user units for ${USER}"
+    if ! systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service; then
+      echo "[WARN] Could not enable PipeWire user units (no user systemd session yet?)."
+      echo "[WARN] After first login, run manually as ${USER}:"
+      echo "       systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service"
+    fi
+  else
+    echo "[WARN] systemctl not found; skipping PipeWire user-unit enable step."
+  fi
+}
+
 configure_gtk_dark_theme() {
   echo "[INFO] Setting GTK to prefer dark theme for current user"
   mkdir -p "${HOME}/.config/gtk-3.0" "${HOME}/.config/gtk-4.0"
@@ -429,6 +450,7 @@ build_hyprland_qtutils || echo "[WARN] hyprland-qtutils build failed; continuing
 install_list "Fonts" "${FONTS[@]}"
 
 configure_ly
+configure_pipewire
 configure_gtk_dark_theme
 
-echo "[DONE] Hyprland environment packages and ly login manager ready."
+echo "[DONE] Hyprland environment packages, ly login manager, and PipeWire audio stack ready."
