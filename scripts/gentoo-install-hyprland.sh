@@ -298,7 +298,7 @@ HYPR_PACKAGES=(
   media-libs/mesa
   x11-libs/libdrm
   media-video/pipewire
-  media-video/pipewire-pulse
+  #media-video/pipewire-pulse  # not valid package?
   media-video/wireplumber
   media-libs/alsa-lib
   media-sound/alsa-utils
