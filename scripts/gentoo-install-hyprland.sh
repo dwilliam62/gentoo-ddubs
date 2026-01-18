@@ -160,7 +160,7 @@ install_pkg() {
   # If that failed, try to auto-apply pending config updates, then retry once
   echo "[RETRY] Applying Portage config changes and retrying $pkg..."
   if command -v etc-update >/dev/null 2>&1; then
-    echo -e "-5\ny" | sudo etc-update > /dev/null || true
+    echo -e "-5\ny" | sudo etc-update >/dev/null || true
   else
     echo "[WARN] etc-update not found; skipping automatic config merge."
   fi
@@ -293,7 +293,7 @@ HYPR_PACKAGES=(
   app-shells/starship
   sys-apps/eza
   dev-libs/newt
-  media-video/vlc
+  #  media-video/vlc  # Causes build failures not essential
   sys-apps/flatpak
   media-libs/mesa
   x11-libs/libdrm
