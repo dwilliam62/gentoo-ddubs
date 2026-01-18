@@ -261,6 +261,7 @@ configure_ly() {
 
   # Deploy config files from your ddubs repo
   copy_file "${DDUBS_ROOT}/system/etc/ly/config.ini" "/etc/ly/config.ini" 644
+  copy_file "${DDUBS_ROOT}/system/etc/ly/save.ini" "/etc/ly/save.ini" 644
   copy_file "${DDUBS_ROOT}/system/etc/ly/wsetup.sh" "/etc/ly/wsetup.sh" 755
   copy_file "${DDUBS_ROOT}/system/etc/ly/xsetup.sh" "/etc/ly/xsetup.sh" 755
   copy_file "${DDUBS_ROOT}/system/etc/pam.d/ly" "/etc/pam.d/ly" 644
@@ -411,6 +412,26 @@ configure_shell_runtime_exports() {
   done
 }
 
+configure_flatpak_flathub() {
+  echo "[INFO] Ensuring Flathub (stable) Flatpak remote is configured for user ${USER}"
+
+  if ! command -v flatpak >/dev/null 2>&1; then
+    echo "[WARN] flatpak command not found; skipping Flatpak remote configuration."
+    return 0
+  fi
+
+  # Only configure the main Flathub repo (no beta/testing remotes)
+  if flatpak --user remote-list 2>/dev/null | awk '{print $1}' | grep -qx "flathub"; then
+    echo "[OK] Flathub Flatpak remote already present for user ${USER}"
+  else
+    if flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo; then
+      echo "[OK] Added Flathub Flatpak remote (user scope)."
+    else
+      echo "[WARN] Failed to add Flathub Flatpak remote; you may need to configure it manually."
+    fi
+  fi
+}
+
 HYPR_PACKAGES=(
   app-crypt/gcr
   # app-misc/app2unit   # need find source for this
@@ -548,6 +569,7 @@ install_list "Fonts" "${FONTS[@]}"
 
 configure_ly
 configure_pipewire
+configure_flatpak_flathub
 configure_gtk_dark_theme
 
 echo "[DONE] Hyprland environment packages, ly login manager, and PipeWire audio stack ready."
