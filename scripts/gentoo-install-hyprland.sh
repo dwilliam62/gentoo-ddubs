@@ -262,7 +262,7 @@ HYPR_PACKAGES=(
   gui-apps/wlr-randr
   gui-apps/wl-clipboard
   x11-misc/matugen
-  app-misc/app2unit
+  # app-misc/app2unit   # need find source for this
   app-misc/ranger
   gui-libs/hyprland-qtutils
   xfce-base/thunar
