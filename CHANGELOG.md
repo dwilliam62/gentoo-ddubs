@@ -45,6 +45,9 @@ All notable changes to this project will be documented in this file.
     - Need to integrate into install script
   - Added Backup script for gentoo config
   - Added `--set-dark` flag set GTK themes to `Aiwaita-Dark`
+  - Need investigate this repo:
+    - `https://codeberg.org/hyproverlay/hyproverlay/src/branch/main`
+    - To build current Hyprland from source
 
 ## 2025-11-05
 
