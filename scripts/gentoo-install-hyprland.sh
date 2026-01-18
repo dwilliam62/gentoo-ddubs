@@ -280,6 +280,20 @@ configure_ly() {
 configure_pipewire() {
   echo "[INFO] Enabling PipeWire + WirePlumber (systemd user units)"
 
+  # Ensure current user is in required audio/video/pipewire groups
+  local grp
+  for grp in audio video pipewire; do
+    if id -nG "${USER}" | grep -qw "$grp"; then
+      echo "[OK] User ${USER} already in group $grp"
+    else
+      if sudo gpasswd -a "${USER}" "$grp"; then
+        echo "[INFO] Added ${USER} to group $grp"
+      else
+        echo "[WARN] Failed to add ${USER} to group $grp (group may not exist?)"
+      fi
+    fi
+  done
+
   if command -v loginctl >/dev/null 2>&1; then
     echo "[INFO] Enabling systemd user lingering for ${USER} (for user services at boot)"
     sudo loginctl enable-linger "${USER}" || \
