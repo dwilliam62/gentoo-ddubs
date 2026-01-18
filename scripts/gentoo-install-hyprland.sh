@@ -295,63 +295,48 @@ EOF
 }
 
 HYPR_PACKAGES=(
-  gui-wm/hyprland
+  app-crypt/gcr
+  # app-misc/app2unit   # need find source for this
+  app-misc/fastfetch
+  app-misc/ranger
+  app-misc/tmux
+  app-misc/nwg-look
+  app-misc/yazi
+  app-shells/starship
+  app-shells/zoxide
+  dev-lang/python
+  dev-libs/libdbusmenu
+  dev-libs/newt
+  gui-apps/awww
+  gui-apps/clipman
+  gui-apps/grim
+  gui-apps/quickshell
   gui-apps/hypridle
   gui-apps/hyprlock
   gui-apps/hyprpaper
+  gui-apps/nwg-drawer
+  gui-apps/nwg-displays
   gui-apps/hyprshot
-  gui-libs/hyprcursor
-  gui-libs/xdg-desktop-portal-hyprland
-  gui-libs/hyprland-qt-support
+  gui-apps/slurp
+  gui-apps/swappy
+  gui-apps/swaync
   gui-apps/waybar
   gui-apps/wlogout
   gui-apps/wofi
-  gui-apps/swaync
-  media-sound/cava
-  gui-apps/awww
-  gui-apps/waypaper
-  gui-apps/grim
-  gui-apps/slurp
-  gui-apps/swappy
-  gui-apps/clipman
-  gui-apps/nwg-displays
-  gui-apps/quickshell
-  gui-apps/nwg-drawer
-  app-misc/nwg-look
   gui-apps/wlr-randr
   gui-apps/wl-clipboard
-  x11-misc/matugen
-  # app-misc/app2unit   # need find source for this
-  app-misc/ranger
-  #gui-libs/hyprland-qtutils
-  xfce-base/thunar
-  xfce-base/tumbler
-  xfce-base/xfce4-panel
-  xfce-base/libxfce4windowing
-  xfce-base/libxfce4ui
-  xfce-base/exo
-  dev-libs/libdbusmenu
-  app-crypt/gcr
-  x11-misc/wallust
-  x11-misc/xdg-user-dirs
-  x11-terms/kitty
-  app-misc/tmux
-  app-misc/yazi
-  dev-lang/python
-  sys-apps/bat
-  sys-fs/ncdu
-  app-shells/zoxide
-  app-shells/starship
-  sys-apps/eza
-  dev-libs/newt
-  #  media-video/vlc  # Causes build failures not essential
-  sys-apps/flatpak
-  media-libs/mesa
-  x11-libs/libdrm
+  gui-apps/waypaper
+  app-misc/nwg-look
+  gui-libs/hyprcursor
+  gui-libs/xdg-desktop-portal-hyprland
+  gui-libs/hyprland-qt-support
+  gui-wm/hyprland
+  #gui-libs/hyprland-qtutils  # built from src no pkg avail
+  media-sound/cava
   media-video/pipewire
-  #media-video/pipewire-pulse  # not valid package?
   media-video/wireplumber
   media-libs/alsa-lib
+  media-libs/mesa
   media-sound/alsa-utils
   media-sound/pavucontrol
   # media-sound/pamixer
@@ -360,13 +345,28 @@ HYPR_PACKAGES=(
   media-sound/playerctl
   media-sound/pavucontrol
   media-libs/libcanberra
-  sys-auth/rtkit
+  media-video/mpv
+  #  media-video/vlc  # Causes build failures not essential
   net-wireless/bluez
   net-wireless/bluez-tools
-  media-video/mpv
   net-misc/networkmanager
-  app-misc/fastfetch
-  app-misc/nwg-look
+  sys-apps/bat
+  sys-fs/ncdu
+  sys-apps/eza
+  sys-auth/rtkit
+  sys-apps/flatpak
+  x11-misc/matugen
+  x11-misc/rofi
+  x11-misc/wallust
+  x11-misc/xdg-user-dirs
+  x11-terms/kitty
+  x11-libs/libdrm
+  xfce-base/thunar
+  xfce-base/tumbler
+  xfce-base/xfce4-panel
+  xfce-base/libxfce4windowing
+  xfce-base/libxfce4ui
+  xfce-base/exo
 )
 
 FONTS=(

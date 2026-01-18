@@ -1,5 +1,5 @@
 ##################################################################
-#                                                                #   
+#                                                                #
 #                                                                #
 #                  TAK_0'S Per-Window-Switch                     #
 #                                                                #
@@ -7,23 +7,17 @@
 #                                                                #
 #  Just a little script that I made to switch keyboard layouts   #
 #       per-window instead of global switching for the more      #
-#                 smooth and comfortable workflow.               #  
+#                 smooth and comfortable workflow.               #
 #                                                                #
 ##################################################################
 
-
-
-
-
-
-
-
-# This is for changing kb_layouts. Set kb_layouts in 
+# This is for changing kb_layouts. Set kb_layouts in
 
 MAP_FILE="$HOME/.cache/kb_layout_per_window"
-CFG_FILE="$HOME/.config/hypr/UserConfigs/UserSettings.conf"
+CFG_FILE="$HOME/.config/hypr/configs/SystemSettings.conf"
 ICON="$HOME/.config/swaync/images/ja.png"
 SCRIPT_NAME="$(basename "$0")"
+LISTENER_PIDFILE="$HOME/.cache/kb_layout_per_window.listener.pid"
 
 # Ensure map file exists
 touch "$MAP_FILE"
@@ -49,8 +43,8 @@ get_keyboards() {
 # Save window-specific layout
 save_map() {
   local W=$1 L=$2
-  grep -v "^${W}:" "$MAP_FILE" > "$MAP_FILE.tmp"
-  echo "${W}:${L}" >> "$MAP_FILE.tmp"
+  grep -v "^${W}:" "$MAP_FILE" >"$MAP_FILE.tmp"
+  echo "${W}:${L}" >>"$MAP_FILE.tmp"
   mv "$MAP_FILE.tmp" "$MAP_FILE"
 }
 
@@ -82,7 +76,7 @@ cmd_toggle() {
       break
     fi
   done
-  NEXT=$(( (i+1) % count ))
+  NEXT=$(((i + 1) % count))
   do_switch "$NEXT"
   save_map "$W" "${kb_layouts[NEXT]}"
   notify-send -u low -i "$ICON" "kb_layout: ${kb_layouts[NEXT]}"
@@ -104,7 +98,10 @@ cmd_restore() {
 # Listen to focus events and restore window-specific layouts
 subscribe() {
   local SOCKET2="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
-  [[ -S "$SOCKET2" ]] || { echo "Error: Hyprland socket not found." >&2; exit 1; }
+  [[ -S "$SOCKET2" ]] || {
+    echo "Error: Hyprland socket not found." >&2
+    return 1
+  }
 
   socat -u UNIX-CONNECT:"$SOCKET2" - | while read -r line; do
     [[ "$line" =~ ^activewindow ]] && cmd_restore
@@ -112,12 +109,26 @@ subscribe() {
 }
 
 # Ensure only one listener
-if ! pgrep -f "$SCRIPT_NAME.*--listener" >/dev/null; then
-  subscribe --listener &
-fi
+start_listener_once() {
+  if [[ -f "$LISTENER_PIDFILE" ]]; then
+    local existing_pid
+    existing_pid=$(cat "$LISTENER_PIDFILE" 2>/dev/null || true)
+    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+      return
+    fi
+  fi
+
+  subscribe &
+  echo $! >"$LISTENER_PIDFILE"
+}
+
+start_listener_once
 
 # CLI
 case "$1" in
-  toggle|"") cmd_toggle ;;
-  *) echo "Usage: $SCRIPT_NAME [toggle]" >&2; exit 1 ;;
+toggle | "") cmd_toggle ;;
+*)
+  echo "Usage: $SCRIPT_NAME [toggle]" >&2
+  exit 1
+  ;;
 esac

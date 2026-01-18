@@ -28,7 +28,7 @@ killall -SIGUSR2 waybar
 sleep 0.1
 
 # quit ags & relaunch ags
-ags -q && ags &
+#ags -q && ags &
 
 # quit quickshell & relaunch quickshell
 pkill qs && qs &
