@@ -305,7 +305,9 @@ HYPR_PACKAGES=(
   media-libs/alsa-lib
   media-sound/alsa-utils
   media-sound/pavucontrol
-  media-sound/pamixer
+  # media-sound/pamixer
+  #   2026-01-18: Temporarily disabled.
+  #   Fails to build (ICU / C++14 mismatch in /usr/include/unicode/unistr.h; needs ebuild/overlay fix).
   media-sound/playerctl
   media-sound/pwvucontrol
   media-libs/libcanberra
