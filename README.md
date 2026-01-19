@@ -23,6 +23,9 @@
 
 - 🚀 Installs Hyprland: Will install Hyprland from Gentoo repo and needed packages
   - Currently Gentoo Hyprland is at v0.51.1 in testing repo
+- Installs `OxWM` Window Manager from `@tony,btw`
+  - Inspired by `dwm` built in rust, fast and lightweight
+  - GitHub repo [here](https://github.com/tonybanters/oxwm)
 - 📦 System snapshot: Portage configs, world file, fstab, locale, kernel .config
 - 🧩 Window manager: Hyprland
   - Login manager: `ly`
@@ -74,7 +77,7 @@ scripts/
   bash scripts/gentool-install-hyprland.sh
   ```
 
-## 🪟 Window manager
+## 🪟 Window managers
 
 - Hyprland
   - Wayland session entry: `/usr/share/wayland-sessions/hyprland.desktop`
@@ -82,7 +85,7 @@ scripts/
 - OxWM
   - X11 Window Manager
   - Inspired by `dwm`
-  - Built is `rust`
+  - Built in `rust`
   - Fast and lightweight
   - From `@tony,btw`
   - GitHub repo [here](https://github.com/tonybanters/oxwm)
