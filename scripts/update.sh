@@ -31,8 +31,54 @@ log_dir="$HOME/Documents"
 now_ts="$(date +%Y%m%d-%H%M%S)"
 precheck_md="$log_dir/precheck-${now_ts}.md"
 post_md="$log_dir/Post-Update-${now_ts}-Report.md"
+OXWM_REPO_URL="https://github.com/tonybanters/oxwm"
+OXWM_DIR="/opt/oxwm"
 
 say() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
+
+oxwm_build_user() {
+  if [ -d "$OXWM_DIR" ]; then
+    stat -c %U "$OXWM_DIR" 2>/dev/null || echo "${SUDO_USER:-$USER}"
+  else
+    echo "${SUDO_USER:-$USER}"
+  fi
+}
+
+build_oxwm() {
+  local build_user
+  build_user="$(oxwm_build_user)"
+  say "Building OXWM (cargo build --release)..."
+  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && cargo build --release"
+  if [ -f "${OXWM_DIR}/target/release/oxwm" ]; then
+    install -Dm755 "${OXWM_DIR}/target/release/oxwm" /usr/local/bin/oxwm
+    say "Installed /usr/local/bin/oxwm"
+  else
+    say "WARN: OXWM build finished but binary not found at target/release/oxwm"
+  fi
+}
+
+update_oxwm_repo() {
+  local build_user
+  build_user="$(oxwm_build_user)"
+  if [ -d "${OXWM_DIR}/.git" ]; then
+    say "Checking OXWM repo for updates..."
+    local before after
+    before=$(sudo -u "$build_user" git -C "$OXWM_DIR" rev-parse HEAD)
+    sudo -u "$build_user" git -C "$OXWM_DIR" pull --ff-only
+    after=$(sudo -u "$build_user" git -C "$OXWM_DIR" rev-parse HEAD)
+    if [ "$before" != "$after" ]; then
+      say "OXWM updated; rebuilding..."
+      build_oxwm
+    else
+      say "OXWM already up to date."
+    fi
+  else
+    say "OXWM repo not found. Cloning ${OXWM_REPO_URL}..."
+    git clone "$OXWM_REPO_URL" "$OXWM_DIR"
+    chown -R "$build_user":"$build_user" "$OXWM_DIR"
+    build_oxwm
+  fi
+}
 
 print_usage() {
   cat <<'EOF'
@@ -266,6 +312,8 @@ main() {
     say "Update failed. No post-update report generated."
     exit 1
   fi
+
+  update_oxwm_repo
 
   # Optional maintenance (best-effort)
   if command -v etc-update >/dev/null 2>&1; then

@@ -79,3 +79,10 @@ scripts/
 - Hyprland
   - Wayland session entry: `/usr/share/wayland-sessions/hyprland.desktop`
   - Default in ly is set via `/etc/ly/save.ini` (session_index)
+- OxWM
+  - X11 Window Manager
+  - Inspired by `dwm`
+  - Built is `rust`
+  - Fast and lightweight
+  - From `@tony,btw`
+  - GitHub repo [here](https://github.com/tonybanters/oxwm)

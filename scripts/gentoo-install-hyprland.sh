@@ -6,6 +6,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 # Repo root (one level above scripts/)
 DDUBS_ROOT="$(realpath "${SCRIPT_DIR}/..")"
+OXWM_REPO_URL="https://github.com/tonybanters/oxwm"
+OXWM_DIR="/opt/oxwm"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -242,6 +244,57 @@ build_hyprland_qtutils() {
     sudo mkdir -p "$(dirname "$marker")"
     sudo touch "$marker"
   fi
+}
+install_oxwm_from_source() {
+  echo "[INFO] Ensuring OXWM is installed from source (${OXWM_REPO_URL})"
+  require_cmd git
+  require_cmd cargo
+
+  local build_user="${SUDO_USER:-$USER}"
+
+  if [[ -d "${OXWM_DIR}/.git" ]]; then
+    echo "[INFO] Updating existing OXWM repo in ${OXWM_DIR}..."
+    sudo -u "$build_user" git -C "$OXWM_DIR" pull --ff-only
+  elif [[ -e "${OXWM_DIR}" ]]; then
+    echo "[ERROR] ${OXWM_DIR} exists but is not a git repository. Please remove or fix it." >&2
+    return 1
+  else
+    echo "[INFO] Cloning OXWM into ${OXWM_DIR}..."
+    sudo git clone "$OXWM_REPO_URL" "$OXWM_DIR"
+    sudo chown -R "$build_user":"$build_user" "$OXWM_DIR"
+  fi
+
+  echo "[INFO] Building OXWM (cargo build --release)..."
+  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && cargo build --release"
+
+  if [[ -f "${OXWM_DIR}/target/release/oxwm" ]]; then
+    sudo install -Dm755 "${OXWM_DIR}/target/release/oxwm" /usr/local/bin/oxwm
+    echo "[OK] Installed /usr/local/bin/oxwm"
+  else
+    echo "[WARN] OXWM build completed but binary not found at target/release/oxwm" >&2
+  fi
+}
+
+deploy_oxwm_dotfiles() {
+  echo "[INFO] Deploying OxWM, picom, and dunst configs from repo dotfiles"
+  local src="${DDUBS_ROOT}/dotfiles/home/.config"
+  local dst="${HOME}/.config"
+
+  mkdir -p "${dst}"
+  for dir in oxwm picom dunst; do
+    if [[ -d "${src}/${dir}" ]]; then
+      mkdir -p "${dst}/${dir}"
+      rsync -a "${src}/${dir}/" "${dst}/${dir}/"
+      echo "[OK] Synced ${dir} config to ${dst}/${dir}"
+    else
+      echo "[WARN] Missing ${src}/${dir} (skipped)"
+    fi
+  done
+}
+
+configure_oxwm_session() {
+  echo "[INFO] Installing OxWM XSession desktop entry"
+  copy_file "${DDUBS_ROOT}/system/usr/share/xsessions/oxwm.desktop" "/usr/share/xsessions/oxwm.desktop" 644
 }
 
 copy_file() {
@@ -506,6 +559,30 @@ HYPR_PACKAGES=(
   xfce-base/exo
 )
 
+OXWM_PACKAGES=(
+  dev-util/pkgconf
+  media-gfx/feh
+  media-gfx/flameshot
+  media-gfx/maim
+  media-libs/fontconfig
+  media-libs/freetype
+  x11-apps/xrandr
+  x11-apps/xrdb
+  x11-apps/xset
+  x11-apps/xsetroot
+  x11-libs/libX11
+  x11-libs/libXft
+  x11-misc/arandr
+  x11-misc/dunst
+  x11-misc/nitrogen
+  x11-misc/picom
+  x11-misc/polkit-gnome
+  x11-misc/variety
+  x11-misc/xclip
+  x11-misc/xdotool
+  x11-misc/xwallpaper
+)
+
 FONTS=(
   media-fonts/cardo
   media-fonts/cascadia-code
@@ -561,6 +638,7 @@ ensure_pipewire_use_fix
 prebuild_problematic_binaries
 sudo emerge -1av dev-lang/rust-bin:1.92.0
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
+install_list "OxWM X11 extras" "${OXWM_PACKAGES[@]}"
 configure_shell_runtime_exports
 
 # Build hyprland-qtutils from source if needed (not in main Gentoo repo yet)
@@ -572,5 +650,8 @@ configure_ly
 configure_pipewire
 configure_flatpak_flathub
 configure_gtk_dark_theme
+install_oxwm_from_source
+configure_oxwm_session
+deploy_oxwm_dotfiles
 
 echo "[DONE] Hyprland environment packages, ly login manager, and PipeWire audio stack ready."

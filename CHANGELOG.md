@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2025-1-19
+
+- Added: `OxWM` Window Manager from `@tony,btw`
+- GitHub repo [here](https://github.com/tonybanters/oxwm)
+- Inspired by `dwm` built with `rust`
+
 ## 2025-1-18
 
 - Major re-do of the script
