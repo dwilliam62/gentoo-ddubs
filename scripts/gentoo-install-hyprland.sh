@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Gentoo Hyprland install helper using package hints from ../gentoo-ddubs
+# Also now installs OxWM
 
 set -euo pipefail
 
@@ -350,7 +351,7 @@ configure_pipewire() {
 
   if command -v loginctl >/dev/null 2>&1; then
     echo "[INFO] Enabling systemd user lingering for ${USER} (for user services at boot)"
-    sudo loginctl enable-linger "${USER}" || \
+    sudo loginctl enable-linger "${USER}" ||
       echo "[WARN] Failed to enable linger for ${USER}; PipeWire user services will start only after login."
   fi
 
@@ -456,7 +457,7 @@ configure_shell_runtime_exports() {
           echo '# Hyprland audio runtime exports (added by gentoo-install-hyprland.sh)'
           echo 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"'
           echo 'export PULSE_SERVER="unix:${XDG_RUNTIME_DIR}/pulse/native"'
-        } >> "$rc"
+        } >>"$rc"
         echo "[OK] Added runtime exports to $rc"
       fi
     else
@@ -530,7 +531,7 @@ HYPR_PACKAGES=(
   media-libs/mesa
   media-sound/alsa-utils
   media-sound/pavucontrol
-  media-sound/pamixer  # C++17 env fix applied via ensure_pamixer_cxx17_fix
+  media-sound/pamixer # C++17 env fix applied via ensure_pamixer_cxx17_fix
   media-sound/playerctl
   media-sound/pavucontrol
   media-libs/libcanberra
