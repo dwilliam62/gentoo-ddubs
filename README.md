@@ -23,9 +23,8 @@
 
 - 🚀 Install Hyprland: Will build current Gentoo Hyprland and needed packages
 - 📦 System snapshot: Portage configs, world file, fstab, locale, kernel .config
-- 🧩 Window managers: Hyprland (default in ly) and DWM (local build wrapper)
-- 🧰 Suckless stack: dwm, st, slstatus built to `~/.local`
-- 🗂️ Dotfiles: hypr, rofi, picom, dunst, sxhkd, scripts, dwm autostart
+- 🧩 Window managers: Hyprland (default in ly)
+- 🗂️ Dotfiles: Jakoolit's Hyprland config
 - 🚀 One-command user setup: `scripts/deploy-dotfiles.sh`
   - This is Jak Koolit's Hyprland config.
   - You can install your own or clone from his repo for most current version
@@ -68,18 +67,11 @@ scripts/
 - Clone and deploy user configs
   ```
   git clone https://github.com/dwilliam62/gentoo-ddubs.git
-  cd gentoo-ddubs
-  bash scripts/deploy-dotfiles.sh
-  ```
-- Install required tools (Gentoo examples)
-  ```
-  sudo emerge --ask dunst picom rofi sxhkd feh nitrogen games-misc/fortune-mod x11-terms/wezterm
-  # Optional: Variety via Flatpak (if available on your system)
-  flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-  flatpak --user install -y flathub com.github.variety.Variety || true
+  cd ~/gentoo-ddubs
+  bash scripts/gentool-install-hyprland.sh
   ```
 
-## 🪟 Window managers
+## 🪟 Window manager
 
 - Hyprland
   - Wayland session entry: `/usr/share/wayland-sessions/hyprland.desktop`
