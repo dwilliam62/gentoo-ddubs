@@ -563,6 +563,7 @@ HYPR_PACKAGES=(
   x11-misc/rofi
   x11-misc/wallust
   x11-misc/xdg-user-dirs
+  x11-terms/alacritty
   x11-terms/kitty
   x11-libs/libdrm
   xfce-base/thunar
