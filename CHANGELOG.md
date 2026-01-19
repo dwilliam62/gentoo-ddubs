@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## 2025-1-18
 
 - Major re-do of the script
+  - Added function in flatpak install to add flathub repo
+  - Set `ly` login manager to `Hyprland` not `Hyprland-uwsm`
+  - Added document describing project
+    - `gentoo-insall-project-overview.md`
   - Walked through process found issues, missing pkgs
   - Wrong package names, conflicting USE flags
   - Added post install script `post-install-cleanup.sh`
