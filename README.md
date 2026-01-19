@@ -1,6 +1,20 @@
 # gentoo-ddubs 🐧⚙️
 
-A reproducible snapshot of my Gentoo VM plus dotfiles and scripts to bootstrap a similar system quickly. It includes Portage configuration, kernel config, and desktop configs for Hyprland and a patched DWM setup.
+## A reproducible snapshot of _my_ Gentoo config, plus Jak's Hyprland dotfiles
+
+- Scripts to bootstrap a similar system quickly.
+- It includes Portage configuration
+- kernel config
+- Desktop configs for Hyprland
+- There are scripts for upgrading, post-install cleanup
+
+> Note: I don't promise this will work for you.  
+> I created this so I can test Hyprland dotfiles with Gentoo
+> Mostly Jak's Hyprland [dotfiles](https://github.com/Jakoolit/Hyprland-Dots)
+
+- The `gentoo-install-project-overview.md` has more info on this project
+- It does attempt to detect GPU hardware.
+  - To date it's only tested in Proxmox VMs.
 
 ## ✨ Highlights
 
