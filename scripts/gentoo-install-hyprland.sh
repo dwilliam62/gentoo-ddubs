@@ -577,7 +577,7 @@ OXWM_PACKAGES=(
   x11-misc/dunst
   x11-misc/nitrogen
   x11-misc/picom
-  x11-misc/polkit-gnome
+  gnome-extra/polkit-gnome
   x11-misc/variety
   x11-misc/xclip
   x11-misc/xdotool
