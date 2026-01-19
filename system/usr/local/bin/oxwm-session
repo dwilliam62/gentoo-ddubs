@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+is_qemu_vm() {
+  if command -v systemd-detect-virt >/dev/null 2>&1; then
+    if systemd-detect-virt --quiet --vm; then
+      local virt
+      virt="$(systemd-detect-virt 2>/dev/null || true)"
+      [[ "${virt}" == "qemu" ]] && return 0
+      return 1
+    fi
+  fi
+
+  if [[ -r /sys/class/dmi/id/product_name ]]; then
+    if grep -qi "qemu" /sys/class/dmi/id/product_name; then
+      return 0
+    fi
+  fi
+  if [[ -r /sys/class/dmi/id/sys_vendor ]]; then
+    if grep -qi "qemu" /sys/class/dmi/id/sys_vendor; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+if is_qemu_vm; then
+  if command -v xrandr >/dev/null 2>&1; then
+    xrandr -s 1920x1080
+  fi
+  sleep 0.3
+fi
+
+exec /usr/local/bin/oxwm

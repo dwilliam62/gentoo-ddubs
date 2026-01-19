@@ -309,6 +309,7 @@ deploy_oxwm_dotfiles() {
 configure_oxwm_session() {
   echo "[INFO] Installing OxWM XSession desktop entry"
   copy_file "${DDUBS_ROOT}/system/usr/share/xsessions/oxwm.desktop" "/usr/share/xsessions/oxwm.desktop" 644
+  copy_file "${DDUBS_ROOT}/system/usr/local/bin/oxwm-session" "/usr/local/bin/oxwm-session" 755
 }
 
 copy_file() {

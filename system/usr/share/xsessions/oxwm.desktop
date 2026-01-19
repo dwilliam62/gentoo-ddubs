@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=OXWM
 Comment=OXWM X11 Tiling Window Manager
-Exec=/usr/local/bin/oxwm
-TryExec=/usr/local/bin/oxwm
+Exec=/usr/local/bin/oxwm-session
+TryExec=/usr/local/bin/oxwm-session
 Type=XSession
