@@ -188,19 +188,30 @@ install_list() {
 # This is needed because gui-libs/hyprland-qtutils is not yet available in
 # the main Gentoo tree. We clone upstream, build with CMake, and install.
 # On success, the temporary build directory is removed.
-build_hyprland_qtutils() {
-  echo "[INFO] Ensuring hyprland-qtutils is installed from source"
-
-  # Prefer binary-on-PATH check if it exists
+hyprland_qtutils_installed() {
+  # Any known binaries or installed package indicates presence.
   if command -v hyprland-qtutils >/dev/null 2>&1; then
-    echo "[OK] hyprland-qtutils already present in PATH, skipping source build."
     return 0
   fi
-
+  if command -v hyprland-dialog >/dev/null 2>&1; then
+    return 0
+  fi
+  if qlist -I gui-libs/hyprland-qtutils >/dev/null 2>&1; then
+    return 0
+  fi
   # Fallback: idempotent marker file in case the binary name/location changes
   local marker="/var/lib/hyprland-qtutils-ddubs/installed"
   if [[ -f "$marker" ]]; then
-    echo "[OK] hyprland-qtutils previously installed by this script (marker: $marker); skipping source build."
+    return 0
+  fi
+  return 1
+}
+
+build_hyprland_qtutils() {
+  echo "[INFO] Ensuring hyprland-qtutils is installed from source"
+
+  if hyprland_qtutils_installed; then
+    echo "[OK] hyprland-qtutils already present; skipping source build."
     return 0
   fi
 
