@@ -578,7 +578,6 @@ OXWM_PACKAGES=(
   x11-misc/nitrogen
   x11-misc/picom
   gnome-extra/polkit-gnome
-  x11-misc/variety
   x11-misc/xclip
   x11-misc/xdotool
   x11-misc/xwallpaper
