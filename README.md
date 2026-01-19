@@ -3,7 +3,7 @@
 ## A reproducible snapshot of _my_ Gentoo config
 
 - Plus snapshot of Jak's Hyprland dotfiles
-- You can download current version [here](https://github.com/Jakoolit/Hyprland-Dots)
+- You can download current dotfiles [here](https://github.com/Jakoolit/Hyprland-Dots)
 
 - Scripts to bootstrap a similar system quickly.
 - It includes Portage configuration
