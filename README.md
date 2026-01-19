@@ -21,13 +21,16 @@
 
 ## ✨ Highlights
 
-- 🚀 Install Hyprland: Will build current Gentoo Hyprland and needed packages
+- 🚀 Installs Hyprland: Will install Hyprland from Gentoo repo and needed packages
+  - Currently Gentoo Hyprland is at v0.51.1 in testing repo
 - 📦 System snapshot: Portage configs, world file, fstab, locale, kernel .config
-- 🧩 Window managers: Hyprland (default in ly)
+- 🧩 Window manager: Hyprland
+  - Login manager: `ly`
 - 🗂️ Dotfiles: Jakoolit's Hyprland config
-- 🚀 One-command user setup: `scripts/deploy-dotfiles.sh`
+- 🚀 One-command user setup: `scripts/gentoo-install-hyprland.sh`
   - This is Jak Koolit's Hyprland config.
   - You can install your own or clone from his repo for most current version
+  - Jakoolit's dotfiles are NOT auto installed just the Hyprland WM
 
 ## 📁 Layout
 
