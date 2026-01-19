@@ -22,7 +22,7 @@
 local modkey = "Mod4"
 
 -- Terminal emulator command (defualts to alacritty)
-local terminal = "kitty-bg"
+local terminal = "kitty"
 
 -- Color palette - customize these to match your theme
 -- Alternatively you can import other files in here, such as
@@ -314,5 +314,6 @@ oxwm.key.chord({
 -- Uncomment and modify these examples, or add your own
 
 --oxwm.autostart("picom -b")
-oxwm.autostart("xwallpaper --zoom ~/Pictures/CuteCat.png")
+oxwm.autostart("xrandr -s 1920x1080 && sleep 0.5")
+oxwm.autostart("xwallpaper --zoom ~/Pictures/PurpleNightmar.png")
 oxwm.autostart("dunst")
