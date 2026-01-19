@@ -560,6 +560,7 @@ HYPR_PACKAGES=(
   sys-apps/flatpak
   www-client/google-chrome
   x11-misc/matugen
+  x11-misc/dmenu
   x11-misc/rofi
   x11-misc/wallust
   x11-misc/xdg-user-dirs
