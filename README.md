@@ -1,6 +1,9 @@
 # gentoo-ddubs 🐧⚙️
 
-## A reproducible snapshot of _my_ Gentoo config, plus Jak's Hyprland dotfiles
+## A reproducible snapshot of _my_ Gentoo config
+
+- Plus snapshot of Jak's Hyprland dotfiles
+- You can download current version [here](https://github.com/Jakoolit/Hyprland-Dots)
 
 - Scripts to bootstrap a similar system quickly.
 - It includes Portage configuration
