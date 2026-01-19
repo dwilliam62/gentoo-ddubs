@@ -559,6 +559,7 @@ ensure_gentoo_rsync_repo
 ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
 prebuild_problematic_binaries
+sudo emerge -1av dev-lang/rust-bin:1.92.0
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 configure_shell_runtime_exports
 
