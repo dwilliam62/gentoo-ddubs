@@ -74,6 +74,8 @@ media-libs/libcanberra alsa pulseaudio
 gui-libs/gtk-layer-shell introspection
 # kitty Wayland build
 x11-terms/kitty wayland
+# ly display manager should enumerate X sessions
+x11-misc/ly X
 # mpv/vlc dependency
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
