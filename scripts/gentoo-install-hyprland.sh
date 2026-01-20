@@ -456,6 +456,45 @@ ensure_pipewire_use_fix() {
     echo 'media-libs/libpulse glib' | sudo tee -a "${libpulse_use}" >/dev/null
   fi
 }
+ensure_kernel_postinst_efi_update() {
+  echo "[INFO] Ensuring kernel postinst hook updates EFI boot files"
+
+  # Create the directory if it doesn't exist
+  sudo mkdir -p /etc/kernel/postinst.d
+
+  # Create the automation script (idempotent overwrite)
+  sudo tee /etc/kernel/postinst.d/99-efi-update.sh >/dev/null <<'EOF'
+#!/bin/sh
+set -eu
+
+KVER="${1:-}"
+if [ -z "$KVER" ]; then
+  echo "Usage: $0 <kernel-version>" >&2
+  exit 1
+fi
+
+VMLINUX="/boot/kernel-${KVER}"
+INITRAMFS="/boot/initramfs-${KVER}.img"
+EFI_DIR="/boot/efi"
+
+if [ ! -d "$EFI_DIR" ]; then
+  echo "EFI directory not found: $EFI_DIR (is it mounted?)" >&2
+  exit 1
+fi
+
+if [ ! -f "$VMLINUX" ] || [ ! -f "$INITRAMFS" ]; then
+  echo "Missing kernel/initramfs for ${KVER} in /boot" >&2
+  exit 1
+fi
+
+cp "$VMLINUX" "$EFI_DIR/vmlinuz.efi"
+cp "$INITRAMFS" "$EFI_DIR/initramfs.img"
+echo "EFI Boot files updated to $KVER"
+EOF
+
+  # Make it executable
+  sudo chmod +x /etc/kernel/postinst.d/99-efi-update.sh
+}
 
 configure_shell_runtime_exports() {
   echo "[INFO] Ensuring XDG_RUNTIME_DIR and PULSE_SERVER exports in user shell rc files"
@@ -501,6 +540,7 @@ configure_flatpak_flathub() {
 }
 
 HYPR_PACKAGES=(
+  app-admin/eclean-kernel
   app-crypt/gcr
   # app-misc/app2unit   # need find source for this
   app-misc/fastfetch
@@ -651,6 +691,7 @@ ensure_video_cards
 ensure_gentoo_rsync_repo
 ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
+ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
 install_if_missing dev-lang/rust-bin
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
