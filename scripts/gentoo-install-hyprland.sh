@@ -49,9 +49,9 @@ dev-cpp/gtkmm:3.0 wayland X
 # cairo / cairomm for GTK/Waybar
 # Align with Portage suggestion to resolve slot collision:
 #   - x11-libs/cairo-1.18.4-r1 (Change USE: +X +aqua)
-#   - dev-cpp/cairomm-1.18.0 (Change USE: +X)
+#   - dev-cpp/cairomm-1.14.5 (Change USE: +X)
 >=x11-libs/cairo-1.18.4-r1 X aqua svg
->=dev-cpp/cairomm-1.18.0 X
+dev-cpp/cairomm X
 # Thunar requires libxfce4ui with either wayland or X
 >=xfce-base/libxfce4ui-4.20.2 wayland
 # XFCE stack for Thunar + panel on Wayland
