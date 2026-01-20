@@ -540,7 +540,6 @@ configure_flatpak_flathub() {
 }
 
 HYPR_PACKAGES=(
-  app-admin/eclean-kernel
   app-crypt/gcr
   # app-misc/app2unit   # need find source for this
   app-misc/fastfetch
