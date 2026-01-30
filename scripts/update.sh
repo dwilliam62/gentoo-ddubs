@@ -154,12 +154,31 @@ EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y @world)
 # Ensure repo root exists
 mkdir -p "$log_dir"
 
+maybe_disable_unsupported_overlays() {
+  # Best-effort guard against known-broken overlays that ship unsupported EAPIs.
+  # Currently handles: wayland-desktop (broken gui-desq EAPI=7 ebuilds).
+  if ! command -v eselect >/dev/null 2>&1; then
+    return
+  fi
+
+  if eselect repository list 2>/dev/null | awk '/\*/ {print $2}' | grep -qx 'wayland-desktop'; then
+    say "Detected enabled overlay 'wayland-desktop'; attempting to disable to avoid EAPI 7 sync failures..."
+    if eselect repository disable wayland-desktop >/dev/null 2>&1; then
+      say "Disabled overlay 'wayland-desktop'."
+    else
+      say "WARN: Failed to disable overlay 'wayland-desktop'; sync may still fail."
+    fi
+  fi
+}
+
 # Sync Portage unless disabled
 maybe_sync() {
   if [ "$NO_SYNC" = "true" ]; then
     say "Skipping repository sync (per --no-sync)"
     return
   fi
+
+  maybe_disable_unsupported_overlays
   
   if command -v emaint >/dev/null 2>&1; then
     say "Syncing all repos (emaint sync -a)..."
