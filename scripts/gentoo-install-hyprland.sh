@@ -16,6 +16,32 @@ require_cmd() {
     exit 1
   fi
 }
+ensure_hyproverlay_repo() {
+  echo "[INFO] Ensuring hyproverlay repository is enabled"
+
+  if ! command -v eselect >/dev/null 2>&1; then
+    echo "[WARN] eselect not found; cannot manage overlays automatically."
+    return 0
+  fi
+
+  if ! eselect repository list >/dev/null 2>&1; then
+    echo "[INFO] Installing app-eselect/eselect-repository..."
+    sudo emerge -v --ask=n app-eselect/eselect-repository
+  fi
+
+  if eselect repository list 2>/dev/null | awk '/\*/ {print $2}' | grep -qx "hyproverlay"; then
+    echo "[OK] hyproverlay is already enabled."
+    return 0
+  fi
+
+  if eselect repository list 2>/dev/null | awk 'NR>1 {print $2}' | grep -qx "hyproverlay"; then
+    echo "[INFO] Enabling existing hyproverlay entry..."
+    sudo eselect repository enable hyproverlay
+  else
+    echo "[INFO] Adding and enabling hyproverlay..."
+    sudo eselect repository enable hyproverlay
+  fi
+}
 
 require_cmd sudo
 require_cmd emerge
@@ -556,12 +582,12 @@ HYPR_PACKAGES=(
   gui-apps/clipman
   gui-apps/grim
   gui-apps/quickshell
-  gui-apps/hypridle
-  gui-apps/hyprlock
-  gui-apps/hyprpaper
+  gui-apps/hypridle::hyproverlay
+  gui-apps/hyprlock::hyproverlay
+  gui-apps/hyprpaper::hyproverlay
   gui-apps/nwg-drawer
   gui-apps/nwg-displays
-  gui-apps/hyprshot
+  gui-apps/hyprshot::hyproverlay
   gui-apps/slurp
   gui-apps/swappy
   gui-apps/swaync
@@ -572,10 +598,10 @@ HYPR_PACKAGES=(
   gui-apps/wlr-randr
   gui-apps/wl-clipboard
   gui-apps/waypaper
-  gui-libs/hyprcursor
-  gui-libs/xdg-desktop-portal-hyprland
-  gui-libs/hyprland-qt-support
-  gui-wm/hyprland
+  gui-libs/hyprcursor::hyproverlay
+  gui-libs/xdg-desktop-portal-hyprland::hyproverlay
+  gui-libs/hyprland-qt-support::hyproverlay
+  gui-wm/hyprland::hyproverlay
   #gui-libs/hyprland-qtutils  # built from src no pkg avail
   media-sound/cava
   media-video/pipewire
@@ -688,6 +714,7 @@ ensure_use_flags
 # ensure_unmask_hypr_qtutils  # disabled until gui-libs/hyprland-qtutils lands in main Gentoo repo
 ensure_video_cards
 ensure_gentoo_rsync_repo
+ensure_hyproverlay_repo
 ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
 ensure_kernel_postinst_efi_update

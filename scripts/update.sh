@@ -44,6 +44,29 @@ oxwm_build_user() {
   fi
 }
 
+ensure_hyproverlay_repo() {
+  if ! command -v eselect >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! eselect repository list >/dev/null 2>&1; then
+    say "Installing app-eselect/eselect-repository..."
+    emerge -n app-eselect/eselect-repository || {
+      say "WARN: Failed to install app-eselect/eselect-repository; cannot manage hyproverlay automatically."
+      return
+    }
+  fi
+
+  if eselect repository list 2>/dev/null | awk '/\*/ {print $2}' | grep -qx 'hyproverlay'; then
+    return
+  fi
+
+  say "Enabling hyproverlay repository for Hyprland packages..."
+  if ! eselect repository enable hyproverlay >/dev/null 2>&1; then
+    say "WARN: Failed to enable hyproverlay; Hyprland packages may remain masked."
+  fi
+}
+
 build_oxwm() {
   local build_user
   build_user="$(oxwm_build_user)"
@@ -179,6 +202,7 @@ maybe_sync() {
   fi
 
   maybe_disable_unsupported_overlays
+  ensure_hyproverlay_repo
   
   if command -v emaint >/dev/null 2>&1; then
     say "Syncing all repos (emaint sync -a)..."
