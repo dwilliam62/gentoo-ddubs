@@ -47,13 +47,13 @@ oxwm_build_user() {
 build_oxwm() {
   local build_user
   build_user="$(oxwm_build_user)"
-  say "Building OXWM (cargo build --release)..."
-  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && cargo build --release"
-  if [ -f "${OXWM_DIR}/target/release/oxwm" ]; then
-    install -Dm755 "${OXWM_DIR}/target/release/oxwm" /usr/local/bin/oxwm
+  say "Building OXWM (zig build -Doptimize=ReleaseFast)..."
+  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && zig build -Doptimize=ReleaseFast"
+  if [ -f "${OXWM_DIR}/zig-out/bin/oxwm" ]; then
+    install -Dm755 "${OXWM_DIR}/zig-out/bin/oxwm" /usr/local/bin/oxwm
     say "Installed /usr/local/bin/oxwm"
   else
-    say "WARN: OXWM build finished but binary not found at target/release/oxwm"
+    say "WARN: OXWM build finished but binary not found at zig-out/bin/oxwm"
   fi
 }
 

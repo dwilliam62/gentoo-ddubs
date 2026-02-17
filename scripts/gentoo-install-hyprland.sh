@@ -262,7 +262,7 @@ build_hyprland_qtutils() {
 install_oxwm_from_source() {
   echo "[INFO] Ensuring OXWM is installed from source (${OXWM_REPO_URL})"
   require_cmd git
-  require_cmd cargo
+  require_cmd zig
 
   local build_user="${SUDO_USER:-$USER}"
 
@@ -278,14 +278,14 @@ install_oxwm_from_source() {
     sudo chown -R "$build_user":"$build_user" "$OXWM_DIR"
   fi
 
-  echo "[INFO] Building OXWM (cargo build --release)..."
-  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && cargo build --release"
+  echo "[INFO] Building OXWM (zig build -Doptimize=ReleaseFast)..."
+  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && zig build -Doptimize=ReleaseFast"
 
-  if [[ -f "${OXWM_DIR}/target/release/oxwm" ]]; then
-    sudo install -Dm755 "${OXWM_DIR}/target/release/oxwm" /usr/local/bin/oxwm
+  if [[ -f "${OXWM_DIR}/zig-out/bin/oxwm" ]]; then
+    sudo install -Dm755 "${OXWM_DIR}/zig-out/bin/oxwm" /usr/local/bin/oxwm
     echo "[OK] Installed /usr/local/bin/oxwm"
   else
-    echo "[WARN] OXWM build completed but binary not found at target/release/oxwm" >&2
+    echo "[WARN] OXWM build completed but binary not found at zig-out/bin/oxwm" >&2
   fi
 }
 
@@ -692,7 +692,7 @@ ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
 ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
-install_if_missing dev-lang/rust-bin
+install_if_missing dev-lang/zig
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 install_list "OxWM X11 extras" "${OXWM_PACKAGES[@]}"
 configure_shell_runtime_exports
