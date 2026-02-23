@@ -16,6 +16,34 @@ require_cmd() {
     exit 1
   fi
 }
+ensure_nix_with_flakes() {
+  local nix_conf="/etc/nix/nix.conf"
+  local nix_features="extra-experimental-features = nix-command flakes"
+
+  if ! command -v nix >/dev/null 2>&1; then
+    echo "[INFO] Installing Nix (daemon) ..."
+    local url="${NIX_INSTALL_URL:-https://nixos.org/nix/install}"
+    local flags="${NIX_INSTALL_FLAGS:---daemon --yes}"
+    if curl -fsSL "$url" | sudo sh -s -- $flags; then
+      echo "[INFO] Nix installed. Enabling flakes..."
+      sudo mkdir -p /etc/nix
+      if ! sudo grep -q "^extra-experimental-features" "$nix_conf" 2>/dev/null; then
+        echo "$nix_features" | sudo tee -a "$nix_conf" >/dev/null
+      fi
+      echo "[WARN] Nix requires a new shell. Please restart your shell and re-run this script."
+      exit 0
+    else
+      echo "[ERROR] Nix install failed."
+      exit 1
+    fi
+  fi
+
+  # Ensure flakes enabled if nix already installed
+  sudo mkdir -p /etc/nix
+  if ! sudo grep -q "^extra-experimental-features" "$nix_conf" 2>/dev/null; then
+    echo "$nix_features" | sudo tee -a "$nix_conf" >/dev/null
+  fi
+}
 ensure_hyproverlay_repo() {
   echo "[INFO] Ensuring hyproverlay repository is enabled"
 
@@ -45,6 +73,8 @@ ensure_hyproverlay_repo() {
 
 require_cmd sudo
 require_cmd emerge
+require_cmd curl
+ensure_nix_with_flakes
 
 # Ensure equery is available for package checks
 if ! command -v equery >/dev/null 2>&1; then
