@@ -136,14 +136,6 @@ x11-misc/ly X
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
 }
-# ensure_unmask_hypr_qtutils() {
-#   echo "[INFO] Unmasking gui-libs/hyprland-qtutils (temporarily masked upstream)"
-#   local unmask_file="/etc/portage/package.unmask/hyprland-qtutils"
-#   sudo mkdir -p /etc/portage/package.unmask
-#   sudo tee "$unmask_file" >/dev/null <<'EOF'
-# gui-libs/hyprland-qtutils
-# EOF
-# }
 ensure_video_cards() {
   echo "[INFO] Ensuring VIDEO_CARDS includes virgl and detecting hardware..."
   local mc="/etc/portage/make.conf"
@@ -242,79 +234,6 @@ install_list() {
   done
 }
 
-# Build and install hyprland-qtutils from source if not already present.
-# This is needed because gui-libs/hyprland-qtutils is not yet available in
-# the main Gentoo tree. We clone upstream, build with CMake, and install.
-# On success, the temporary build directory is removed.
-hyprland_qtutils_installed() {
-  # Any known binaries or installed package indicates presence.
-  if command -v hyprland-qtutils >/dev/null 2>&1; then
-    return 0
-  fi
-  if command -v hyprland-dialog >/dev/null 2>&1; then
-    return 0
-  fi
-  if qlist -I gui-libs/hyprland-qtutils >/dev/null 2>&1; then
-    return 0
-  fi
-  # Fallback: idempotent marker file in case the binary name/location changes
-  local marker="/var/lib/hyprland-qtutils-ddubs/installed"
-  if [[ -f "$marker" ]]; then
-    return 0
-  fi
-  return 1
-}
-
-build_hyprland_qtutils() {
-  echo "[INFO] Ensuring hyprland-qtutils is installed from source"
-
-  if hyprland_qtutils_installed; then
-    echo "[OK] hyprland-qtutils already present; skipping source build."
-    return 0
-  fi
-
-  require_cmd git
-  require_cmd cmake
-
-  local workdir
-  workdir=$(mktemp -d -t hyprland-qtutils-XXXXXX) || {
-    echo "[ERROR] Failed to create temporary directory for hyprland-qtutils build" >&2
-    return 1
-  }
-
-  echo "[INFO] Using temporary build directory: $workdir"
-
-  if ! (
-    set -e
-    cd "$workdir"
-    echo "[INFO] Cloning hyprwm/hyprland-qtutils..."
-    git clone https://github.com/hyprwm/hyprland-qtutils.git .
-    echo "[INFO] Configuring hyprland-qtutils (CMake Release build)..."
-    cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-    echo "[INFO] Building hyprland-qtutils..."
-    cmake --build build --config Release --target all
-    echo "[INFO] Installing hyprland-qtutils (sudo cmake --install build)..."
-    sudo cmake --install build
-  ); then
-    echo "[ERROR] hyprland-qtutils build or install failed; leaving sources in $workdir for inspection." >&2
-    return 1
-  fi
-
-  # Verify installation and clean up
-  if command -v hyprland-qtutils >/dev/null 2>&1; then
-    echo "[SUCCESS] hyprland-qtutils installed successfully. Cleaning up $workdir"
-    rm -rf "$workdir" || echo "[WARN] Failed to remove temporary directory $workdir" >&2
-  else
-    echo "[WARN] hyprland-qtutils build finished but binary not found in PATH; keeping $workdir for debugging." >&2
-  fi
-
-  # Record successful install so subsequent runs can skip rebuild even if the
-  # binary name/location changes in the future.
-  if [[ ! -f "$marker" ]]; then
-    sudo mkdir -p "$(dirname "$marker")"
-    sudo touch "$marker"
-  fi
-}
 install_oxwm_from_source() {
   echo "[INFO] Ensuring OXWM is installed from source (${OXWM_REPO_URL})"
   require_cmd git
@@ -631,8 +550,8 @@ HYPR_PACKAGES=(
   gui-libs/hyprcursor::hyproverlay
   gui-libs/xdg-desktop-portal-hyprland::hyproverlay
   gui-libs/hyprland-qt-support::hyproverlay
+  gui-libs/hyprland-qtutils
   gui-wm/hyprland::hyproverlay
-  #gui-libs/hyprland-qtutils  # built from src no pkg avail
   media-sound/cava
   media-video/pipewire
   media-video/wireplumber
@@ -741,7 +660,6 @@ fi
 
 echo "[INFO] Starting Gentoo Hyprland package installation"
 ensure_use_flags
-# ensure_unmask_hypr_qtutils  # disabled until gui-libs/hyprland-qtutils lands in main Gentoo repo
 ensure_video_cards
 ensure_gentoo_rsync_repo
 ensure_hyproverlay_repo
@@ -753,9 +671,6 @@ install_if_missing dev-lang/zig
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 install_list "OxWM X11 extras" "${OXWM_PACKAGES[@]}"
 configure_shell_runtime_exports
-
-# Build hyprland-qtutils from source if needed (not in main Gentoo repo yet)
-build_hyprland_qtutils || echo "[WARN] hyprland-qtutils build failed; continuing without it."
 
 install_list "Fonts" "${FONTS[@]}"
 

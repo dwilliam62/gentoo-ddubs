@@ -60,7 +60,6 @@ Automate bringing a Gentoo system to a working Hyprland desktop with:
 - PipeWire/WirePlumber audio stack
 - ly login manager configured for Hyprland by default
 - User runtime exports and GTK dark theme settings
-- Optional helper: source build of `hyprland-qtutils`
 - Flatpak main Flathub remote configured for the user
 
 The script is designed to be re-runnable and idempotent where practical: it skips packages already installed, reuses Portage configuration files, and avoids duplicating configuration entries.
@@ -77,12 +76,11 @@ In order of execution at the bottom of the script:
 6. `prebuild_problematic_binaries`
 7. `install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"`
 8. `configure_shell_runtime_exports`
-9. `build_hyprland_qtutils` (best-effort)
-10. `install_list "Fonts" "${FONTS[@]}"`
-11. `configure_ly`
-12. `configure_pipewire`
-13. `configure_flatpak_flathub`
-14. `configure_gtk_dark_theme`
+9. `install_list \"Fonts\" \"${FONTS[@]}\"`
+10. `configure_ly`
+11. `configure_pipewire`
+12. `configure_flatpak_flathub`
+13. `configure_gtk_dark_theme`
 
 Each of these steps is encapsulated in a function; failures in optional helpers are logged but generally do not abort the whole run unless critical.
 
@@ -179,7 +177,7 @@ These helpers provide the primitives used by the rest of the script to query and
   - Core graphical stack:
     - `gui-wm/hyprland`
     - `gui-apps/hypridle`, `hyprlock`, `hyprpaper`, `hyprshot`
-    - `gui-libs/hyprcursor`, `xdg-desktop-portal-hyprland`, `hyprland-qt-support`
+    - `gui-libs/hyprcursor`, `xdg-desktop-portal-hyprland`, `hyprland-qt-support`, `hyprland-qtutils`
   - Wayland utilities:
     - `gui-apps/awww`, `clipman`, `grim`, `slurp`, `swappy`, `swaync`, `waybar`, `wlogout`, `wofi`, `wlr-randr`, `wl-clipboard`, `waypaper`
     - `gui-apps/nwg-drawer`, `nwg-displays`, `quickshell`
@@ -214,27 +212,14 @@ These helpers provide the primitives used by the rest of the script to query and
       JetBrains Mono, Nerd Fonts, Droid, Victor Mono, Fantasque Sans Mono,
       Noto (including emoji), Source Code Pro, Symbols Nerd Font, URW fonts.
 
-### 3.6 Building hyprland-qtutils from source
-
-- `build_hyprland_qtutils()`
-  - Checks for a `hyprland-qtutils` binary in `PATH`.
-  - Also uses a marker file `/var/lib/hyprland-qtutils-ddubs/installed` to avoid rebuilding even if binary name/path changes.
-  - On first run, performs:
-    1. `git clone https://github.com/hyprwm/hyprland-qtutils.git` into a temporary dir.
-    2. `cmake -B build -S . -DCMAKE_BUILD_TYPE=Release`
-    3. `cmake --build build --config Release --target all`
-    4. `sudo cmake --install build`
-  - On success, cleans up the temporary directory and writes the marker.
-  - On failure, leaves the directory on disk and logs a warning without aborting the entire installer.
-
-### 3.7 File deployment helper
+### 3.6 File deployment helper
 
 - `copy_file(src, dst, mode)`
   - Thin wrapper around `install -Dm<mode>`.
   - Logs success and warns if the source file is missing.
   - Used heavily by `configure_ly` to deploy config files from `system/` into `/etc`.
 
-### 3.8 Login manager: `configure_ly()`
+### 3.7 Login manager: `configure_ly()`
 
 Responsibilities:
 
@@ -261,7 +246,7 @@ Responsibilities:
    - The `save.ini` file is part of `system/etc/ly/` and contains `session_index`.
    - That index is aligned to the Hyprland Wayland session entry, so the default ly session is Hyprland (not Hyprland-uwsm).
 
-### 3.9 PipeWire and audio: `configure_pipewire()`
+### 3.8 PipeWire and audio: `configure_pipewire()`
 
 - Adds the current user to audio-related groups: `audio`, `video`, `pipewire` (where present).
 - Enables lingering for the user via `loginctl enable-linger`, so user systemd services can run without an active login session.
@@ -271,7 +256,7 @@ Responsibilities:
   - `wireplumber.service`
 - If user-level systemd is not active yet (e.g. running from TTY with no user systemd session), logs a warning and prints the manual command to run later as the user.
 
-### 3.10 User runtime exports: `configure_shell_runtime_exports()`
+### 3.9 User runtime exports: `configure_shell_runtime_exports()`
 
 - Ensures the following vars are exported in `~/.bashrc` and `~/.zshrc`:
 
@@ -283,7 +268,7 @@ Responsibilities:
 
 - Only appends the block once per file by checking for a marker comment.
 
-### 3.11 Flatpak remote: `configure_flatpak_flathub()`
+### 3.10 Flatpak remote: `configure_flatpak_flathub()`
 
 - Only runs if the `flatpak` command is available (installed as part of `HYPR_PACKAGES`).
 - Operates at user scope (`--user`).
@@ -298,7 +283,7 @@ Responsibilities:
   3. Logs whether Flathub was added or already present.
 - Does not configure any beta/testing remotes; this is intentionally limited to the main Flathub remote.
 
-### 3.12 GTK dark theme: `configure_gtk_dark_theme()`
+### 3.11 GTK dark theme: `configure_gtk_dark_theme()`
 
 - Writes `~/.config/gtk-3.0/settings.ini` and `~/.config/gtk-4.0/settings.ini` for the current user:
 

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-02-26
+
+- Removed source-build helper for `hyprland-qtutils` now that it is available via Portage/overlay.
+- Added `gui-libs/hyprland-qtutils` to the Hyprland package list in `gentoo-install-hyprland.sh`.
+
 ## 2025-1-19
 
 - Added: `OxWM` Window Manager from `@tony,btw`

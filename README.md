@@ -62,7 +62,6 @@ scripts/
   post-install-cleanup.sh      # optional script to cleanup tarballs, etc
   set-default-pointer-theme    # sets cursor to Adwaita others get HL logo
   update.sh                    # Update gentoo
-  hyprland-qtutils/build-hyprland-qtutils   # currently not in repo manual build
 
   > Note: There are some other misc scripts those are WIP and should not be used
 
