@@ -29,6 +29,8 @@ WARN="${C_YELLOW}⚠${C_RESET}"
 ERR="${C_RED}✖${C_RESET}"
 STEPS=0
 FAILURES=0
+STEPS_RUN=()
+STEPS_FAILED=()
 
 say() {
   printf "%s %s%s%s %s\n" "$1" "${C_GRAY}" "$(date +%H:%M:%S)" "${C_RESET}" "$2"
@@ -38,11 +40,13 @@ run_step() {
   local label="$1"; shift
   say "$INFO" "Starting ${label} ..."
   STEPS=$((STEPS + 1))
+  STEPS_RUN+=("$label")
   if "$@"; then
     say "$OK" "Done ${label}"
   else
     say "$ERR" "Failed ${label} (continuing)"
     FAILURES=$((FAILURES + 1))
+    STEPS_FAILED+=("$label")
     return 1
   fi
 }
@@ -118,6 +122,18 @@ main() {
   say "$INFO" "Steps run: ${STEPS}"
   say "$INFO" "Failures: ${FAILURES}"
   say "$INFO" "Elapsed: ${elapsed_hms}"
+  if [ "${#STEPS_RUN[@]}" -gt 0 ]; then
+    say "$INFO" "Steps attempted:"
+    for s in "${STEPS_RUN[@]}"; do
+      printf "  %b %s\n" "$OK" "$s"
+    done
+  fi
+  if [ "${#STEPS_FAILED[@]}" -gt 0 ]; then
+    say "$WARN" "Steps failed:"
+    for s in "${STEPS_FAILED[@]}"; do
+      printf "  %b %s\n" "$ERR" "$s"
+    done
+  fi
 }
 
 main "$@"
