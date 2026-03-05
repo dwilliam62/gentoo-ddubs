@@ -44,6 +44,28 @@ oxwm_build_user() {
   fi
 }
 
+
+# Fix known-bad EAPI in waffle-builds overlay (EAPI 7 no longer supported)
+fix_waffle_builds_eapi() {
+  local repo="/var/db/repos/waffle-builds"
+  if [ ! -d "$repo" ]; then
+    return
+  fi
+
+  say "Patching waffle-builds EAPI 7 -> 8 (logiops/touchegg)..."
+  find "$repo" -type f \( -name 'logiops-*.ebuild' -o -name 'touchegg-*.ebuild' \) -print0 \
+    | while IFS= read -r -d '' f; do
+        sed -i 's/^EAPI=7$/EAPI=8/' "$f"
+      done
+
+  if [ -f "$repo/app-misc/logiops/logiops-0.2.3.ebuild" ]; then
+    ebuild "$repo/app-misc/logiops/logiops-0.2.3.ebuild" manifest
+  fi
+  if [ -f "$repo/sys-apps/touchegg/touchegg-2.0.8.ebuild" ]; then
+    ebuild "$repo/sys-apps/touchegg/touchegg-2.0.8.ebuild" manifest
+  fi
+}
+
 ensure_hyproverlay_repo() {
   if ! command -v eselect >/dev/null 2>&1; then
     return
@@ -322,6 +344,7 @@ main() {
 
   # Sync if requested/default (only when a mode was selected)
   maybe_sync
+  fix_waffle_builds_eapi
   maybe_update_eix
 
   say "Evaluating pending updates (pretend)..."
