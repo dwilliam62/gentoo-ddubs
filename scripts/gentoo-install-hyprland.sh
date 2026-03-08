@@ -123,6 +123,9 @@ dev-libs/libdbusmenu gtk3
 media-video/pipewire pulseaudio sound-server extra alsa-pipewire
 media-libs/libcanberra alsa pulseaudio
 >=media-libs/libpulse-17.0 X glib
+# gdk-pixbuf JPEG loaders (for rofi/thumbnailing)
+x11-libs/gdk-pixbuf jpeg
+xfce-base/tumbler jpeg
 # swaync (GTK4) requirements
 >=gui-libs/gtk-4.20.3-r2 wayland
 >=gui-libs/gtk4-layer-shell-1.1.1-r1 vala introspection
@@ -431,6 +434,16 @@ ensure_pipewire_use_fix() {
     echo 'media-libs/libpulse glib' | sudo tee -a "${libpulse_use}" >/dev/null
   fi
 }
+ensure_gdk_pixbuf_loaders_cache() {
+  if command -v gdk-pixbuf-query-loaders >/dev/null 2>&1; then
+    echo "[INFO] Updating gdk-pixbuf loaders cache"
+    if ! sudo gdk-pixbuf-query-loaders --update-cache; then
+      echo "[WARN] Failed to update gdk-pixbuf loaders cache; run manually if needed."
+    fi
+  else
+    echo "[WARN] gdk-pixbuf-query-loaders not found; skipping loaders cache update."
+  fi
+}
 ensure_kernel_postinst_efi_update() {
   echo "[INFO] Ensuring kernel postinst hook updates EFI boot files"
 
@@ -669,6 +682,7 @@ ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
 install_if_missing dev-lang/zig
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
+ensure_gdk_pixbuf_loaders_cache
 install_list "OxWM X11 extras" "${OXWM_PACKAGES[@]}"
 configure_shell_runtime_exports
 

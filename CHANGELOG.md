@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-03-08
+
+- Added gdk-pixbuf/tumbler JPEG USE flags in ensure_use_flags.
+- Added ensure_gdk_pixbuf_loaders_cache
+- Called after the Hyprland package install.
+
 ## 2026-02-26
 
 - Removed source-build helper for `hyprland-qtutils` now that it is available via Portage/overlay.

@@ -53,16 +53,25 @@ fix_waffle_builds_eapi() {
   fi
 
   say "Patching waffle-builds EAPI 7 -> 8 (logiops/touchegg)..."
-  find "$repo" -type f \( -name 'logiops-*.ebuild' -o -name 'touchegg-*.ebuild' \) -print0 \
-    | while IFS= read -r -d '' f; do
-        sed -i 's/^EAPI=7$/EAPI=8/' "$f"
-      done
+  find "$repo" -type f -name 'logiops-*.ebuild' -exec sed -i 's/^EAPI=7$/EAPI=8/' {} +
+  find "$repo" -type f -name 'touchegg-*.ebuild' -exec sed -i 's/^EAPI=7$/EAPI=8/' {} +
+
+  # Clear any stale metadata cache so eix parses updated EAPIs
+  if [ -d "$repo/metadata/cache" ]; then
+    rm -rf "$repo/metadata/cache"
+  fi
 
   if [ -f "$repo/app-misc/logiops/logiops-0.2.3.ebuild" ]; then
     ebuild "$repo/app-misc/logiops/logiops-0.2.3.ebuild" manifest
   fi
   if [ -f "$repo/sys-apps/touchegg/touchegg-2.0.8.ebuild" ]; then
     ebuild "$repo/sys-apps/touchegg/touchegg-2.0.8.ebuild" manifest
+  fi
+
+  if grep -R "^EAPI=7" -n "$repo/app-misc/logiops" "$repo/sys-apps/touchegg" >/dev/null 2>&1; then
+    say "WARN: Some waffle-builds ebuilds still show EAPI=7 after patch."
+  else
+    say "Waffle-builds EAPI patch verified."
   fi
 }
 
@@ -228,7 +237,7 @@ maybe_sync() {
   
   if command -v emaint >/dev/null 2>&1; then
     say "Syncing all repos (emaint sync -a)..."
-    emaint sync -a
+    emaint sync -a || true
   else
     say "Syncing Portage tree (emerge --sync)..."
     emerge --sync
@@ -239,7 +248,19 @@ maybe_sync() {
 maybe_update_eix() {
   if command -v eix-update >/dev/null 2>&1; then
     say "Refreshing eix cache (eix-update)..."
-    eix-update || true
+    local tmp tmp2
+    tmp="$(mktemp)"
+    tmp2="$(mktemp)"
+    eix-update >"$tmp" 2>&1 || true
+    if grep -q "EAPI 7 not supported" "$tmp"; then
+      say "Detected EAPI 7 errors during eix-update; reapplying waffle-builds fix and retrying..."
+      fix_waffle_builds_eapi
+      eix-update >"$tmp2" 2>&1 || true
+      cat "$tmp2"
+    else
+      cat "$tmp"
+    fi
+    rm -f "$tmp" "$tmp2"
   fi
 }
 
