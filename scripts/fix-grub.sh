@@ -138,11 +138,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 list_kernels() {
+  ensure_privileges
   local kernels=()
   while IFS= read -r -d '' f; do
-    kernels+=("$f")
-  done < <(find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -print0 2>/dev/null || true)
-  printf "%s\n" "${kernels[@]}"
+    [[ -n "$f" ]] && kernels+=("$f")
+  done < <($SUDO find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -print0 2>/dev/null || true)
+  printf "%s\n" "${kernels[@]}" | sed '/^$/d'
 }
 
 kernel_version_from_path() {
@@ -170,14 +171,16 @@ latest_two_versions() {
 }
 
 get_default_kernel_from_grubcfg() {
+  ensure_privileges
   [[ -f "$GRUB_CFG" ]] || return 1
-  awk '
+  $SUDO awk '
     $1=="menuentry" {in_menu=1}
     in_menu && ($1=="linux" || $1=="linuxefi") {print $2; exit}
   ' "$GRUB_CFG"
 }
 
 print_kernel_table() {
+  ensure_privileges
   local running latest default_kernel default_ver
   running="$(uname -r)"
   default_kernel="$(get_default_kernel_from_grubcfg || true)"
@@ -224,9 +227,10 @@ print_kernel_table() {
 }
 
 print_grub_info_table() {
+  ensure_privileges
   [[ -f "$GRUB_CFG" ]] || die "Missing $GRUB_CFG"
   printf "%-4s %-40s %-30s %-30s\n" "Idx" "Title" "Kernel" "Initrd"
-  awk -v max=40 '
+  $SUDO awk -v max=40 '
     $1=="menuentry" {
       idx++; in_menu=1;
       title=$0;
@@ -245,8 +249,9 @@ print_grub_info_table() {
 }
 
 grub_entries_raw() {
+  ensure_privileges
   [[ -f "$GRUB_CFG" ]] || die "Missing $GRUB_CFG"
-  awk '
+  $SUDO awk '
     $1=="menuentry" {
       idx++; in_menu=1;
       title=$0;
