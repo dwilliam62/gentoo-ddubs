@@ -146,6 +146,14 @@ list_kernels() {
   printf "%s\n" "${kernels[@]}" | sed '/^$/d'
 }
 
+list_kernel_versions() {
+  ensure_privileges
+  $SUDO find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -printf '%f\n' 2>/dev/null \
+    | sed -e 's/^kernel-//' -e 's/^vmlinuz-//' \
+    | sed '/^$/d' \
+    | sort -V
+}
+
 kernel_version_from_path() {
   local base
   base="$(basename "$1")"
@@ -154,16 +162,10 @@ kernel_version_from_path() {
   printf "%s" "$base"
 }
 
-sorted_versions() {
-  local v
-  while IFS= read -r v; do
-    [[ -n "$v" ]] && printf "%s\n" "$v"
-  done | sort -V
-}
 
 latest_two_versions() {
   local versions
-  versions="$(sorted_versions)"
+  versions="$(list_kernel_versions)"
   local latest prev
   latest="$(printf "%s\n" "$versions" | tail -n 1)"
   prev="$(printf "%s\n" "$versions" | tail -n 2 | head -n 1)"
@@ -189,14 +191,12 @@ print_kernel_table() {
     default_ver="$(kernel_version_from_path "$default_kernel")"
   fi
 
-  local kernels versions
-  kernels="$(list_kernels)"
-  if [[ -z "$kernels" ]]; then
+  local versions
+  versions="$(list_kernel_versions)"
+  if [[ -z "$versions" ]]; then
     log "WARN" "No kernels found in /boot."
     return 0
   fi
-
-  versions="$(printf "%s\n" "$kernels" | while read -r k; do kernel_version_from_path "$k"; done | sorted_versions)"
   latest="$(printf "%s\n" "$versions" | tail -n 1)"
 
   printf "%-3s %-24s %-12s %-12s %-12s\n" "Idx" "Version" "Latest" "Running" "Default"
@@ -340,13 +340,11 @@ regen_grub() {
 trim_kernels() {
   ensure_privileges
   local versions latest prev keep remove
-  local kernels
-  kernels="$(list_kernels)"
-  if [[ -z "$kernels" ]]; then
+  versions="$(list_kernel_versions)"
+  if [[ -z "$versions" ]]; then
     log "WARN" "No kernels found in /boot."
     return 0
   fi
-  versions="$(printf "%s\n" "$kernels" | while read -r k; do kernel_version_from_path "$k"; done | sorted_versions)"
   read -r latest prev < <(latest_two_versions)
 
   keep=()
@@ -418,6 +416,6 @@ fi
 
 regen_grub
 
-if [[ "$(list_kernels | wc -l | tr -d ' ')" -gt 2 ]]; then
+if [[ "$(list_kernel_versions | wc -l | tr -d ' ')" -gt 2 ]]; then
   log "INFO" "More than two kernels detected. You can trim older ones with: $SCRIPT_NAME --trim"
 fi
