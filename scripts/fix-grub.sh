@@ -159,8 +159,8 @@ latest_two_versions() {
 get_default_kernel_from_grubcfg() {
   [[ -f "$GRUB_CFG" ]] || return 1
   awk '
-    $1=="menuentry" {in=1}
-    in && ($1=="linux" || $1=="linuxefi") {print $2; exit}
+    $1=="menuentry" {in_menu=1}
+    in_menu && ($1=="linux" || $1=="linuxefi") {print $2; exit}
   ' "$GRUB_CFG"
 }
 
@@ -215,18 +215,18 @@ print_grub_info_table() {
   printf "%-4s %-40s %-30s %-30s\n" "Idx" "Title" "Kernel" "Initrd"
   awk -v max=40 '
     $1=="menuentry" {
-      idx++; in=1;
+      idx++; in_menu=1;
       title=$0;
       sub(/^menuentry '\''/, "", title);
       sub(/'\''.*$/, "", title);
       kernel=""; initrd="";
     }
-    in && ($1=="linux" || $1=="linuxefi") {kernel=$2}
-    in && ($1=="initrd" || $1=="initrdefi") {initrd=$2}
-    in && $1=="}" {
+    in_menu && ($1=="linux" || $1=="linuxefi") {kernel=$2}
+    in_menu && ($1=="initrd" || $1=="initrdefi") {initrd=$2}
+    in_menu && $1=="}" {
       if (length(title) > max) {title=substr(title,1,max-3) "..."}
       printf "%-4s %-40s %-30s %-30s\n", idx, title, kernel, initrd;
-      in=0;
+      in_menu=0;
     }
   ' "$GRUB_CFG"
 }
@@ -235,17 +235,17 @@ grub_entries_raw() {
   [[ -f "$GRUB_CFG" ]] || die "Missing $GRUB_CFG"
   awk '
     $1=="menuentry" {
-      idx++; in=1;
+      idx++; in_menu=1;
       title=$0;
       sub(/^menuentry '\''/, "", title);
       sub(/'\''.*$/, "", title);
       kernel=""; initrd="";
     }
-    in && ($1=="linux" || $1=="linuxefi") {kernel=$2}
-    in && ($1=="initrd" || $1=="initrdefi") {initrd=$2}
-    in && $1=="}" {
+    in_menu && ($1=="linux" || $1=="linuxefi") {kernel=$2}
+    in_menu && ($1=="initrd" || $1=="initrdefi") {initrd=$2}
+    in_menu && $1=="}" {
       printf "%s|%s|%s|%s\n", idx, title, kernel, initrd;
-      in=0;
+      in_menu=0;
     }
   ' "$GRUB_CFG"
 }
