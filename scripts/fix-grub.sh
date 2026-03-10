@@ -5,6 +5,7 @@ SCRIPT_NAME="$(basename "$0")"
 GRUB_CFG="/boot/grub/grub.cfg"
 LOG_FILE="/var/log/fix-grub.log"
 [[ -w "$(dirname "$LOG_FILE")" ]] || LOG_FILE="/tmp/fix-grub.log"
+SUDO=""
 
 USE_COLOR=0
 if [[ -t 1 ]]; then
@@ -39,6 +40,18 @@ log() {
 die() {
   log "ERROR" "$*"
   exit 1
+}
+
+ensure_privileges() {
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    SUDO=""
+    return 0
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+    return 0
+  fi
+  die "This script requires root privileges (sudo not found)."
 }
 
 usage() {
@@ -251,6 +264,7 @@ grub_entries_raw() {
 }
 
 set_grub_default() {
+  ensure_privileges
   local val="$1"
   local idx="" title="" kernel="" initrd="" match_count=0
   local entries
@@ -288,35 +302,38 @@ set_grub_default() {
   fi
 
   log "INFO" "Setting GRUB default to index $idx${title:+ ($title)}"
-  sudo grub-set-default "$idx"
+  $SUDO grub-set-default "$idx"
   if command -v grub-editenv >/dev/null 2>&1; then
     log "INFO" "GRUB environment:"
-    sudo grub-editenv list || true
+    $SUDO grub-editenv list || true
   fi
 }
 
 show_grub_env() {
+  ensure_privileges
   if command -v grub-editenv >/dev/null 2>&1; then
-    sudo grub-editenv list
+    $SUDO grub-editenv list
   else
     die "grub-editenv not found"
   fi
 }
 
 regen_grub() {
+  ensure_privileges
   log "INFO" "Regenerating GRUB config."
   if [[ "$BACKUP" -eq 1 && -f "$GRUB_CFG" ]]; then
     local bak="$GRUB_CFG.bak-$(date '+%Y%m%d%H%M%S')"
     log "INFO" "Backing up $GRUB_CFG to $bak"
-    sudo cp -a "$GRUB_CFG" "$bak"
+    $SUDO cp -a "$GRUB_CFG" "$bak"
   fi
-  sudo grub-mkconfig -o "$GRUB_CFG"
+  $SUDO grub-mkconfig -o "$GRUB_CFG"
   log "INFO" "GRUB config updated."
-  sudo grep -n "menuentry" -n "$GRUB_CFG" || true
+  $SUDO grep -n "menuentry" -n "$GRUB_CFG" || true
   print_kernel_table
 }
 
 trim_kernels() {
+  ensure_privileges
   local versions latest prev keep remove
   local kernels
   kernels="$(list_kernels)"
@@ -365,7 +382,7 @@ trim_kernels() {
       continue
     fi
 
-    sudo rm -f "$k1" "$k2" "$i1" "$i2"
+    $SUDO rm -f "$k1" "$k2" "$i1" "$i2"
     log "INFO" "Removed kernel artifacts for $v"
   done
 }
