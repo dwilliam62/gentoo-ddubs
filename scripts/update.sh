@@ -9,7 +9,7 @@ set -euo pipefail
 # - Writes a post-update markdown report: Post-Update-<DATE>-Report.md
 #
 # Usage:
-#   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--help]
+#   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--skip-quickshell] [--help]
 #
 # Modes (choose one):
 #   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
@@ -17,10 +17,11 @@ set -euo pipefail
 #   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
 #
 # Options:
-#   --no-sync     Do not run emerge --sync first.
-#   --use-binpkgs Try to use binary packages from PORTAGE_BINHOST (see make.conf).
-#   --auto-yes    Proceed with updates without interactive prompt (omit --ask).
-#   --help        Show this help and exit.
+#   --no-sync         Do not run emerge --sync first.
+#   --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST (see make.conf).
+#   --auto-yes        Proceed with updates without interactive prompt (omit --ask).
+#   --skip-quickshell Exclude gui-apps/quickshell from update/pretend.
+#   --help            Show this help and exit.
 #
 # Notes:
 # - Running with no arguments shows this help and exits; updates are never implicit.
@@ -108,7 +109,7 @@ update_oxwm_repo() {
 print_usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--help]
+  bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--skip-quickshell] [--help]
 
 Modes (choose one):
   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
@@ -116,15 +117,17 @@ Modes (choose one):
   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
 
 Options:
-  --no-sync     Do not run emerge --sync first.
-  --use-binpkgs Try to use binary packages from PORTAGE_BINHOST (see make.conf).
-  --auto-yes    Proceed with updates without interactive prompt (omit --ask).
-  --help        Show this help and exit.
+  --no-sync         Do not run emerge --sync first.
+  --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST (see make.conf).
+  --auto-yes        Proceed with updates without interactive prompt (omit --ask).
+  --skip-quickshell Exclude gui-apps/quickshell from update/pretend.
+  --help            Show this help and exit.
 
 Examples:
   bash scripts/update.sh --eval
   bash scripts/update.sh --dry-run --no-sync
   bash scripts/update.sh --apply --use-binpkgs --auto-yes
+  bash scripts/update.sh --apply --skip-quickshell
 EOF
 }
 
@@ -139,7 +142,7 @@ need_root() {
   
   if [ "$need_sudo" = "true" ]; then
     [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
-    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" USE_BINPKGS="${USE_BINPKGS:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" bash "$0" "$@"
+    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" USE_BINPKGS="${USE_BINPKGS:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" SKIP_QUICKSHELL="${SKIP_QUICKSHELL:-false}" bash "$0" "$@"
   fi
 }
 
@@ -150,6 +153,7 @@ APPLY="false"
 NO_SYNC="false"
 USE_BINPKGS="false"
 AUTO_YES="false"
+SKIP_QUICKSHELL="false"
 args=()
 for a in "$@"; do
   case "$a" in
@@ -159,6 +163,7 @@ for a in "$@"; do
     --no-sync) NO_SYNC="true" ;;
     --use-binpkgs) USE_BINPKGS="true" ;;
     --auto-yes) AUTO_YES="true" ;;
+    --skip-quickshell) SKIP_QUICKSHELL="true" ;;
     --help|-h) print_usage; exit 0 ;;
     *) args+=("$a") ;;
   esac
@@ -174,6 +179,7 @@ fi
 EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --ask=n --color=n @world)
 EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y @world)
 [ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg) && EMERGE_UPDATE+=(--getbinpkg)
+[ "$SKIP_QUICKSHELL" = "true" ] && EMERGE_PRETEND+=(--exclude=gui-apps/quickshell) && EMERGE_UPDATE+=(--exclude=gui-apps/quickshell)
 [ "$AUTO_YES" = "true" ] || EMERGE_UPDATE=(--ask "${EMERGE_UPDATE[@]}")
 
 # Ensure repo root exists
@@ -335,6 +341,9 @@ main() {
   # Sync if requested/default (only when a mode was selected)
   maybe_sync
   maybe_update_eix
+  if [ "$SKIP_QUICKSHELL" = "true" ]; then
+    say "Skipping gui-apps/quickshell (per --skip-quickshell)."
+  fi
 
   say "Evaluating pending updates (pretend)..."
   if ! emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1; then

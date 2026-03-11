@@ -61,7 +61,7 @@ scripts/
   gentoo-cfg-backup.sh        # Simple backup script for current config
   post-install-cleanup.sh      # optional script to cleanup tarballs, etc
   set-default-pointer-theme    # sets cursor to Adwaita others get HL logo
-  update.sh                    # Update gentoo
+  update.sh                    # Update gentoo (supports --skip-quickshell)
 
   > Note: There are some other misc scripts those are WIP and should not be used
 
