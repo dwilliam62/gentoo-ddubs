@@ -45,35 +45,6 @@ oxwm_build_user() {
 }
 
 
-# Fix known-bad EAPI in waffle-builds overlay (EAPI 7 no longer supported)
-fix_waffle_builds_eapi() {
-  local repo="/var/db/repos/waffle-builds"
-  if [ ! -d "$repo" ]; then
-    return
-  fi
-
-  say "Patching waffle-builds EAPI 7 -> 8 (logiops/touchegg)..."
-  find "$repo" -type f -name 'logiops-*.ebuild' -exec sed -i 's/^EAPI=7$/EAPI=8/' {} +
-  find "$repo" -type f -name 'touchegg-*.ebuild' -exec sed -i 's/^EAPI=7$/EAPI=8/' {} +
-
-  # Clear any stale metadata cache so eix parses updated EAPIs
-  if [ -d "$repo/metadata/cache" ]; then
-    rm -rf "$repo/metadata/cache"
-  fi
-
-  if [ -f "$repo/app-misc/logiops/logiops-0.2.3.ebuild" ]; then
-    ebuild "$repo/app-misc/logiops/logiops-0.2.3.ebuild" manifest
-  fi
-  if [ -f "$repo/sys-apps/touchegg/touchegg-2.0.8.ebuild" ]; then
-    ebuild "$repo/sys-apps/touchegg/touchegg-2.0.8.ebuild" manifest
-  fi
-
-  if grep -R "^EAPI=7" -n "$repo/app-misc/logiops" "$repo/sys-apps/touchegg" >/dev/null 2>&1; then
-    say "WARN: Some waffle-builds ebuilds still show EAPI=7 after patch."
-  else
-    say "Waffle-builds EAPI patch verified."
-  fi
-}
 
 ensure_hyproverlay_repo() {
   if ! command -v eselect >/dev/null 2>&1; then
@@ -200,7 +171,7 @@ if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false
 fi
 
 # Common emerge flags
-EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --color=n @world)
+EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --ask=n --color=n @world)
 EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y @world)
 [ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg) && EMERGE_UPDATE+=(--getbinpkg)
 [ "$AUTO_YES" = "true" ] || EMERGE_UPDATE=(--ask "${EMERGE_UPDATE[@]}")
@@ -253,8 +224,6 @@ maybe_update_eix() {
     tmp2="$(mktemp)"
     eix-update >"$tmp" 2>&1 || true
     if grep -q "EAPI 7 not supported" "$tmp"; then
-      say "Detected EAPI 7 errors during eix-update; reapplying waffle-builds fix and retrying..."
-      fix_waffle_builds_eapi
       eix-update >"$tmp2" 2>&1 || true
       cat "$tmp2"
     else
@@ -365,12 +334,15 @@ main() {
 
   # Sync if requested/default (only when a mode was selected)
   maybe_sync
-  fix_waffle_builds_eapi
   maybe_update_eix
 
   say "Evaluating pending updates (pretend)..."
-  if ! emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1; then
-    say "emerge pretend reported errors; see $precheck_md.tmp"
+  emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1
+  # Ignore autounmask/backtracking messages - they're informational
+  # Only exit on actual errors (lines starting with !!!)
+  if grep -E '^!!!' "$precheck_md.tmp" >/dev/null 2>&1; then
+    say "emerge pretend reported critical errors; see $precheck_md.tmp"
+    cat "$precheck_md.tmp"
     exit 1
   fi
   summarize_pretend_to_md <"$precheck_md.tmp" > /dev/null
