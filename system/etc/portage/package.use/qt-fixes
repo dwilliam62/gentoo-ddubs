@@ -1,5 +1,5 @@
 # Enforce opengl and other common Wayland/Desktop flags for Qt6
-dev-qt/qtbase opengl
+dev-qt/qtbase opengl dbus vulkan gui network sql ssl widgets -accessibility
 dev-qt/qttools opengl
-dev-qt/qtdeclarative opengl
+dev-qt/qtdeclarative opengl dbus vulkan network sql ssl widgets -accessibility
 
