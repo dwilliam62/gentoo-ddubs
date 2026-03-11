@@ -337,13 +337,15 @@ main() {
   maybe_update_eix
 
   say "Evaluating pending updates (pretend)..."
-  emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1
-  # Ignore autounmask/backtracking messages - they're informational
-  # Only exit on actual errors (lines starting with !!!)
-  if grep -E '^!!!' "$precheck_md.tmp" >/dev/null 2>&1; then
-    say "emerge pretend reported critical errors; see $precheck_md.tmp"
-    cat "$precheck_md.tmp"
-    exit 1
+  if ! emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1; then
+    # Only treat as fatal when actual errors are present (not just warnings/autounmask).
+    if grep -qE '^!!!|^ \* ERROR:' "$precheck_md.tmp"; then
+      say "emerge pretend reported errors; see $precheck_md.tmp"
+      say "Error summary (from pretend output):"
+      grep -E '^!!!|^ \* ERROR:' "$precheck_md.tmp" | head -n 40
+      exit 1
+    fi
+    say "emerge pretend returned non-zero, but no fatal errors detected; continuing."
   fi
   summarize_pretend_to_md <"$precheck_md.tmp" > /dev/null
   rm -f "$precheck_md.tmp"
