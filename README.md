@@ -34,6 +34,8 @@
   - This is Jak Koolit's Hyprland config.
   - You can install your own or clone from his repo for most current version
   - Jakoolit's dotfiles are NOT auto installed just the Hyprland WM
+- 🧰 Kernel maintenance tools: `sys-kernel/installkernel`, `app-admin/eclean-kernel`, `dev-python/zstandard`
+  - Post-update helper: `scripts/after-kernel-update.sh`
 
 ## 📁 Layout
 

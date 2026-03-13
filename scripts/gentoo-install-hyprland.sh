@@ -582,6 +582,7 @@ HYPR_PACKAGES=(
   net-wireless/bluez-tools
   net-misc/networkmanager
   sys-apps/bat
+  sys-kernel/installkernel
   sys-fs/ncdu
   sys-apps/eza
   sys-auth/rtkit
@@ -601,6 +602,11 @@ HYPR_PACKAGES=(
   xfce-base/libxfce4windowing
   xfce-base/libxfce4ui
   xfce-base/exo
+)
+
+KERNEL_MAINT_PACKAGES=(
+  app-admin/eclean-kernel
+  dev-python/zstandard
 )
 
 OXWM_PACKAGES=(
@@ -682,6 +688,7 @@ ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
 install_if_missing dev-lang/zig
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
+install_list "Kernel maintenance" "${KERNEL_MAINT_PACKAGES[@]}"
 ensure_gdk_pixbuf_loaders_cache
 install_list "OxWM X11 extras" "${OXWM_PACKAGES[@]}"
 configure_shell_runtime_exports
