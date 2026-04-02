@@ -569,6 +569,7 @@ HYPR_PACKAGES=(
   media-video/pipewire
   media-video/wireplumber
   media-libs/alsa-lib
+  media-libs/libshumate
   media-libs/mesa
   media-sound/alsa-utils
   media-sound/pavucontrol
