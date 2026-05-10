@@ -333,6 +333,22 @@ write_post_update_report() {
 
   say "Wrote post-update report: $post_md"
 }
+maybe_refresh_grub_for_new_kernel() {
+  # If a newer kernel is installed but not present in grub.cfg, refresh GRUB.
+  local latest_mod latest_kernel
+  latest_mod="$(ls -t /lib/modules | head -n1 2>/dev/null || true)"
+  [ -n "$latest_mod" ] || return
+  latest_kernel="/boot/kernel-${latest_mod}"
+
+  if [ -e "$latest_kernel" ]; then
+    if ! grep -q "kernel-${latest_mod}" /boot/grub/grub.cfg 2>/dev/null; then
+      say "Detected new kernel ${latest_mod} not in grub.cfg; refreshing GRUB..."
+      bash "${repo_root}/scripts/after-kernel-update.sh" || {
+        say "WARN: after-kernel-update.sh failed; please run it manually."
+      }
+    fi
+  fi
+}
 
 main() {
   # Ensure we have root when needed (apply mode or sync in eval/dry-run)
@@ -410,6 +426,7 @@ main() {
 
   # Post report
   write_post_update_report
+  maybe_refresh_grub_for_new_kernel
   say "Done."
 }
 

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-05-09
+
+- Pinned `zig` compiler to v0.15.2 for ``OxWM`` compatibility  
+- Reworked `/boot/efi` mount options 
+  - To prevent boot failure `can't mount /boot/efi` 
+
 ## 2026-03-08
 
 - Added gdk-pixbuf/tumbler JPEG USE flags in ensure_use_flags.
