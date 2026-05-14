@@ -287,6 +287,12 @@ summarize_pretend_to_md() {
 
   rm -f "$tmp"
 }
+latest_boot_kernel_version() {
+  find /boot -maxdepth 1 -type f -name 'kernel-*' -printf '%f\n' 2>/dev/null \
+    | sed -e 's/^kernel-//' \
+    | sort -V \
+    | tail -n 1
+}
 
 # Generate post-update report using the last precheck as the list of upgrades
 write_post_update_report() {
@@ -318,9 +324,15 @@ write_post_update_report() {
     echo
     echo "## Kernel Status"
     current_k=$(uname -r)
-    latest_k=$(ls -t /lib/modules | head -n1)
-    if [ "$current_k" != "$latest_k" ]; then
+    latest_k="$(latest_boot_kernel_version)"
+    if [ -n "$latest_k" ] && [ "$current_k" != "$latest_k" ]; then
       echo "⚠️ Reboot required: Running $current_k, but $latest_k is installed."
+    fi
+    if [ -n "$latest_k" ] && [ ! -d "/lib/modules/${latest_k}" ]; then
+      echo "⚠️ Missing module tree: /lib/modules/${latest_k}"
+    fi
+    if [ -n "$latest_k" ] && [ ! -d "/usr/src/linux-${latest_k}" ]; then
+      echo "⚠️ Missing source tree: /usr/src/linux-${latest_k}"
     fi
 
     echo
@@ -333,20 +345,40 @@ write_post_update_report() {
 
   say "Wrote post-update report: $post_md"
 }
+
+maybe_fix_linux_symlink() {
+  local latest_source current_target
+  latest_source="$(
+    find /usr/src -maxdepth 1 -mindepth 1 -type d -name 'linux-*' -printf '%f\n' 2>/dev/null \
+      | sort -V \
+      | tail -n 1
+  )"
+  [ -n "$latest_source" ] || return
+
+  current_target="$(readlink /usr/src/linux 2>/dev/null || true)"
+  if [ ! -L /usr/src/linux ] || [ ! -e /usr/src/linux ] || [ "$current_target" != "$latest_source" ]; then
+    ln -sfn "$latest_source" /usr/src/linux
+    say "Updated /usr/src/linux -> ${latest_source}"
+  fi
+}
 maybe_refresh_grub_for_new_kernel() {
   # If a newer kernel is installed but not present in grub.cfg, refresh GRUB.
-  local latest_mod latest_kernel
-  latest_mod="$(ls -t /lib/modules | head -n1 2>/dev/null || true)"
-  [ -n "$latest_mod" ] || return
-  latest_kernel="/boot/kernel-${latest_mod}"
+  local latest_kernel
+  latest_kernel="$(latest_boot_kernel_version)"
+  [ -n "$latest_kernel" ] || return
 
-  if [ -e "$latest_kernel" ]; then
-    if ! grep -q "kernel-${latest_mod}" /boot/grub/grub.cfg 2>/dev/null; then
-      say "Detected new kernel ${latest_mod} not in grub.cfg; refreshing GRUB..."
-      bash "${repo_root}/scripts/after-kernel-update.sh" || {
-        say "WARN: after-kernel-update.sh failed; please run it manually."
-      }
-    fi
+  if [ ! -d "/lib/modules/${latest_kernel}" ]; then
+    say "WARN: Missing /lib/modules/${latest_kernel}; reinstall the matching gentoo-kernel-bin package."
+  fi
+  if [ ! -d "/usr/src/linux-${latest_kernel}" ]; then
+    say "WARN: Missing /usr/src/linux-${latest_kernel}; /usr/src/linux may be stale."
+  fi
+
+  if ! grep -q "kernel-${latest_kernel}" /boot/grub/grub.cfg 2>/dev/null; then
+    say "Detected new kernel ${latest_kernel} not in grub.cfg; refreshing GRUB..."
+    bash "${repo_root}/scripts/after-kernel-update.sh" || {
+      say "WARN: after-kernel-update.sh failed; please run it manually."
+    }
   fi
 }
 
@@ -426,6 +458,7 @@ main() {
 
   # Post report
   write_post_update_report
+  maybe_fix_linux_symlink
   maybe_refresh_grub_for_new_kernel
   say "Done."
 }
