@@ -252,3 +252,22 @@ media-libs/libglvmd X
 # required by xfce-base/thunar-4.20.6::gentoo[trash-panel-plugin]
 # required by thunar (argument)
 >=dev-libs/libdbusmenu-16.04.0-r4 gtk3
+# required by net-print/cups-meta-1::gentoo[postscript]
+# required by net-print/cups-meta (argument)
+>=app-text/ghostscript-gpl-10.06.0 cups
+# required by dev-qt/qtdeclarative-6.10.2::gentoo
+# required by gui-apps/quickshell-9999::guru
+# required by @selected
+# required by @world (argument)
+#>=dev-qt/qtbase-6.10.2 -vulkan
+# required by gui-apps/quickshell-9999::guru
+# required by @selected
+# required by @world (argument)
+>=dev-qt/qtbase-6.10.2 vulkan
+# required by dev-qt/qtdeclarative-6.10.2::gentoo
+# required by dev-qt/qtdeclarative (argument)
+#>=dev-qt/qtbase-6.10.2 -vulkan
+# required by gui-apps/quickshell-9999::guru[crash-handler]
+# required by @selected
+# required by @world (argument)
+>=dev-cpp/cpptrace-1.0.4-r1 unwind

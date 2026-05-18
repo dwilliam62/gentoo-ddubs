@@ -1,3 +1,5 @@
 dev-qt/qt5compat qml
 >=dev-qt/qtbase-6.10.2 vulkan
+>=dev-qt/qtbase-6.10.2 vulkan
+dev-qt/qtbase vulkan
 dev-qt/qtdeclarative vulkan
