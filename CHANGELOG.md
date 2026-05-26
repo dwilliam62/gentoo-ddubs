@@ -2,9 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## 2026-05-09
+## May 2026  
 
-- Pinned `zig` compiler to v0.15.2 for ``OxWM`` compatibility  
+- Added `scripts/update-yazi.sh` 
+  - Checks existing version and updates to current build 
+- Updated `zig` compiler to v0.16.0 `oxwm` now compatible
 - Reworked `/boot/efi` mount options 
   - To prevent boot failure `can't mount /boot/efi` 
 
