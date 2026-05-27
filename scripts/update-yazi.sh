@@ -12,10 +12,10 @@ say() {
 print_usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/update-yazi.sh [--install] [--status|-s] [--remove|-r] [--help|-h]
+  bash scripts/update-yazi.sh [--install|-i] [--status|-s] [--remove|-r] [--help|-h]
 
 Options:
-  --install      Install/update yazi-9999 from guru and apply keyword fix.
+  --install, -i  Install/update yazi-9999 from guru and apply keyword fix.
   --status, -s   Show Yazi install status, current version, and keyword-fix status.
   --remove, -r   Remove app-misc/yazi and remove the yazi-9999 keyword fix.
   --help, -h     Show this help text.
@@ -181,7 +181,7 @@ main() {
     case "$arg" in
       -h|--help) show_help="true" ;;
       -s|--status) do_status="true" ;;
-      --install) do_install="true" ;;
+      -i|--install) do_install="true" ;;
       -r|--remove|/remove) do_remove="true" ;;
       *)
         printf "Unknown option: %s\n\n" "$arg" >&2
@@ -196,10 +196,18 @@ main() {
     exit 2
   fi
 
-  [ "$do_install" = "true" ] && install_yazi "$@"
-  [ "$do_remove" = "true" ] && remove_yazi "$@"
-  [ "$do_status" = "true" ] && status_yazi
-  [ "$show_help" = "true" ] && print_usage
+  if [ "$do_install" = "true" ]; then
+    install_yazi "$@"
+  fi
+  if [ "$do_remove" = "true" ]; then
+    remove_yazi "$@"
+  fi
+  if [ "$do_status" = "true" ]; then
+    status_yazi
+  fi
+  if [ "$show_help" = "true" ]; then
+    print_usage
+  fi
 }
 
 main "$@"
