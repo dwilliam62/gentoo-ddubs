@@ -18,7 +18,7 @@ set -euo pipefail
 #
 # Options:
 #   --no-sync         Do not run emerge --sync first.
-#   --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST (see make.conf).
+#   --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST and allow USE-mismatch binpkg fallback.
 #   --auto-yes        Proceed with updates without interactive prompt (omit --ask).
 #   --skip-quickshell Exclude gui-apps/quickshell from update/pretend.
 #   --help            Show this help and exit.
@@ -43,6 +43,23 @@ oxwm_build_user() {
   else
     echo "${SUDO_USER:-$USER}"
   fi
+}
+
+collect_fatal_pretend_errors() {
+  local input_file="$1"
+  local output_file="$2"
+  awk '
+    /^ \* ERROR:/ {
+      print
+      next
+    }
+    /^!!!/ {
+      if ($0 ~ /The following binary packages have been ignored due to non matching USE/) {
+        next
+      }
+      print
+    }
+  ' "$input_file" >"$output_file"
 }
 
 
@@ -118,7 +135,7 @@ Modes (choose one):
 
 Options:
   --no-sync         Do not run emerge --sync first.
-  --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST (see make.conf).
+  --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST and allow USE-mismatch binpkg fallback.
   --auto-yes        Proceed with updates without interactive prompt (omit --ask).
   --skip-quickshell Exclude gui-apps/quickshell from update/pretend.
   --help            Show this help and exit.
@@ -178,7 +195,7 @@ fi
 # Common emerge flags
 EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --ask=n --color=n @world)
 EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y @world)
-[ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg) && EMERGE_UPDATE+=(--getbinpkg)
+[ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg --binpkg-respect-use=n) && EMERGE_UPDATE+=(--getbinpkg --binpkg-respect-use=n)
 [ "$SKIP_QUICKSHELL" = "true" ] && EMERGE_PRETEND+=(--exclude=gui-apps/quickshell) && EMERGE_UPDATE+=(--exclude=gui-apps/quickshell)
 [ "$AUTO_YES" = "true" ] || EMERGE_UPDATE=(--ask "${EMERGE_UPDATE[@]}")
 
@@ -339,7 +356,11 @@ write_post_update_report() {
     echo "## Remaining Updates"
     echo
     echo '```text'
-    emerge -p -v -u -D --newuse --with-bdeps=y --color=n @world || true
+    if [ "$USE_BINPKGS" = "true" ]; then
+      emerge -p -v -u -D --newuse --with-bdeps=y --color=n --getbinpkg --binpkg-respect-use=n @world || true
+    else
+      emerge -p -v -u -D --newuse --with-bdeps=y --color=n @world || true
+    fi
     echo '```'
   } | tee "$post_md"
 
@@ -396,12 +417,14 @@ main() {
   say "Evaluating pending updates (pretend)..."
   if ! emerge "${EMERGE_PRETEND[@]}" >"$precheck_md.tmp" 2>&1; then
     # Only treat as fatal when actual errors are present (not just warnings/autounmask).
-    if grep -qE '^!!!|^ \* ERROR:' "$precheck_md.tmp"; then
+    if collect_fatal_pretend_errors "$precheck_md.tmp" "$precheck_md.fatal.tmp" && [ -s "$precheck_md.fatal.tmp" ]; then
       say "emerge pretend reported errors; see $precheck_md.tmp"
       say "Error summary (from pretend output):"
-      grep -E '^!!!|^ \* ERROR:' "$precheck_md.tmp" | head -n 40
+      head -n 40 "$precheck_md.fatal.tmp"
+      rm -f "$precheck_md.fatal.tmp"
       exit 1
     fi
+    rm -f "$precheck_md.fatal.tmp"
     say "emerge pretend returned non-zero, but no fatal errors detected; continuing."
   fi
   summarize_pretend_to_md <"$precheck_md.tmp" > /dev/null
