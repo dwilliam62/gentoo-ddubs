@@ -18,7 +18,7 @@ set -euo pipefail
 #
 # Options:
 #   --no-sync         Do not run emerge --sync first.
-#   --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST and allow USE-mismatch binpkg fallback.
+#   --use-binpkgs     Try to fetch binary packages from PORTAGE_BINHOST (USE-mismatch fallback is always enabled).
 #   --auto-yes        Proceed with updates without interactive prompt (omit --ask).
 #   --skip-quickshell Exclude gui-apps/quickshell from update/pretend.
 #   --help            Show this help and exit.
@@ -136,7 +136,7 @@ Modes (choose one):
 
 Options:
   --no-sync         Do not run emerge --sync first.
-  --use-binpkgs     Try to use binary packages from PORTAGE_BINHOST and allow USE-mismatch binpkg fallback.
+  --use-binpkgs     Try to fetch binary packages from PORTAGE_BINHOST (USE-mismatch fallback is always enabled).
   --auto-yes        Proceed with updates without interactive prompt (omit --ask).
   --skip-quickshell Exclude gui-apps/quickshell from update/pretend.
   --help            Show this help and exit.
@@ -194,9 +194,9 @@ if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false
 fi
 
 # Common emerge flags
-EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --ask=n --color=n @world)
-EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y @world)
-[ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg --binpkg-respect-use=n) && EMERGE_UPDATE+=(--getbinpkg --binpkg-respect-use=n)
+EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --ask=n --color=n --binpkg-respect-use=n @world)
+EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y --binpkg-respect-use=n @world)
+[ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg) && EMERGE_UPDATE+=(--getbinpkg)
 [ "$SKIP_QUICKSHELL" = "true" ] && EMERGE_PRETEND+=(--exclude=gui-apps/quickshell) && EMERGE_UPDATE+=(--exclude=gui-apps/quickshell)
 [ "$AUTO_YES" = "true" ] || EMERGE_UPDATE=(--ask "${EMERGE_UPDATE[@]}")
 
@@ -358,9 +358,9 @@ write_post_update_report() {
     echo
     echo '```text'
     if [ "$USE_BINPKGS" = "true" ]; then
-      emerge -p -v -u -D --newuse --with-bdeps=y --color=n --getbinpkg --binpkg-respect-use=n @world || true
+      emerge -p -v -u -D --newuse --with-bdeps=y --color=n --binpkg-respect-use=n --getbinpkg @world || true
     else
-      emerge -p -v -u -D --newuse --with-bdeps=y --color=n @world || true
+      emerge -p -v -u -D --newuse --with-bdeps=y --color=n --binpkg-respect-use=n @world || true
     fi
     echo '```'
   } | tee "$post_md"
