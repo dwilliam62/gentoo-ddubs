@@ -41,7 +41,7 @@ framerate = 30
 bars = 10
 
 [input]
-method = pulse
+method = pipewire
 source = auto
 
 [output]

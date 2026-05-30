@@ -26,6 +26,7 @@ set -euo pipefail
 # Notes:
 # - Running with no arguments shows this help and exits; updates are never implicit.
 # - Post-Update-<DATE>-Report.md is only generated after a successful --apply run.
+# - Set KEEP_KERNELS=<N> to control how many kernels are retained during post-update pruning (default: 2).
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 log_dir="$HOME/Documents"
@@ -383,9 +384,10 @@ maybe_fix_linux_symlink() {
   fi
 }
 maybe_refresh_grub_for_new_kernel() {
-  # If a newer kernel is installed but not present in grub.cfg, refresh GRUB.
-  local latest_kernel
+  # Always prune old kernels and refresh GRUB after successful updates.
+  local latest_kernel keep_kernels
   latest_kernel="$(latest_boot_kernel_version)"
+  keep_kernels="${KEEP_KERNELS:-2}"
   [ -n "$latest_kernel" ] || return
 
   if [ ! -d "/lib/modules/${latest_kernel}" ]; then
@@ -395,12 +397,10 @@ maybe_refresh_grub_for_new_kernel() {
     say "WARN: Missing /usr/src/linux-${latest_kernel}; /usr/src/linux may be stale."
   fi
 
-  if ! grep -q "kernel-${latest_kernel}" /boot/grub/grub.cfg 2>/dev/null; then
-    say "Detected new kernel ${latest_kernel} not in grub.cfg; refreshing GRUB..."
-    bash "${repo_root}/scripts/after-kernel-update.sh" || {
-      say "WARN: after-kernel-update.sh failed; please run it manually."
-    }
-  fi
+  say "Pruning old kernels (keeping ${keep_kernels}) and regenerating GRUB..."
+  KEEP_KERNELS="$keep_kernels" bash "${repo_root}/scripts/after-kernel-update.sh" || {
+    say "WARN: after-kernel-update.sh failed; please run it manually."
+  }
 }
 
 main() {

@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## May 2026  
 
+- Updated: `scripts/update.sh` Now calls kernel cleanup script 
 - Added `scripts/update-yazi.sh` 
   - Checks existing version and updates to current build 
 - Updated `zig` compiler to v0.16.0 `oxwm` now compatible
