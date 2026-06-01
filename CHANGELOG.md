@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Jun 2026  
+
+- Added python override for: 
+   - `nwg-display`
+   - `variety` 
+
 ## May 2026  
 
 - Updated: `scripts/update.sh` Now calls kernel cleanup script 
@@ -11,25 +17,22 @@ All notable changes to this project will be documented in this file.
 - Reworked `/boot/efi` mount options 
   - To prevent boot failure `can't mount /boot/efi` 
 
-## 2026-03-08
+## Apr 2026
 
 - Added gdk-pixbuf/tumbler JPEG USE flags in ensure_use_flags.
 - Added ensure_gdk_pixbuf_loaders_cache
 - Called after the Hyprland package install.
 
-## 2026-02-26
+## Mar 2026
 
 - Removed source-build helper for `hyprland-qtutils` now that it is available via Portage/overlay.
 - Added `gui-libs/hyprland-qtutils` to the Hyprland package list in `gentoo-install-hyprland.sh`.
 
-## 2025-1-19
+## Jan 2026 
 
 - Added: `OxWM` Window Manager from `@tony,btw`
 - GitHub repo [here](https://github.com/tonybanters/oxwm)
 - Inspired by `dwm` built with `rust`
-
-## 2025-1-18
-
 - Major re-do of the script
   - Added function in flatpak install to add flathub repo
   - Set `ly` login manager to `Hyprland` not `Hyprland-uwsm`
@@ -85,7 +88,7 @@ All notable changes to this project will be documented in this file.
     - `https://codeberg.org/hyproverlay/hyproverlay/src/branch/main`
     - To build current Hyprland from source
 
-## 2025-11-05
+## Nov 2025
 
 - Initial repository: imported Gentoo system snapshot (Portage configs, world, fstab, locale, kernel .config) and system metadata.
 - Added dotfiles captured from VM: Hyprland, suckless (dunst, picom, rofi, sxhkd, scripts), and `~/.dwm/autostart.sh`.
