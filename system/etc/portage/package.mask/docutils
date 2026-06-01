@@ -1,0 +1,2 @@
+# Mask docutils-0.23+ to satisfy dev-python/sphinx <0.23 constraint
+>=dev-python/docutils-0.23

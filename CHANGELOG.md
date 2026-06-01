@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Jun 2026  
 
-- Added python override for: 
+- Added python overrides for: 
    - `nwg-display`
    - `variety` 
+   - `docutils`
+   - `pycairo`
+   - `pygobject`
 
 ## May 2026  
 
