@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
    - `pycairo`
    - `pygobject`
    - `waypaper`
+- Added python target fix to `make.conf`
+   - `PYTHON_TARGETS="python3_13 python3_14"`
+   - `PYTHON_SINGLE_TARGET="python3_14"`
 
 ## May 2026  
 
