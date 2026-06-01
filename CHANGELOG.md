@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
    - `docutils`
    - `pycairo`
    - `pygobject`
+   - `waypaper`
 
 ## May 2026  
 
