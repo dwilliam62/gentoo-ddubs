@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Jun 2026  
 
+- Added `clone-gentoo.sh` script 
+   - installs my config on blank systems 
+   - Adds `ly` login mgr 
+   - Udpated `gentoo-install-hyprland` script 
 - Added python overrides for: 
    - `nwg-display`
    - `variety` 

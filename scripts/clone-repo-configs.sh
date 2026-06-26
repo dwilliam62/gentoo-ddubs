@@ -11,6 +11,7 @@ DRY_RUN="false"
 KEEP_CLONE="true"
 INCLUDE_SYSTEM_FILES="false"
 VIDEO_CARDS_OVERRIDE=""
+LY_ONLY="false"
 
 say() {
   printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
@@ -31,6 +32,7 @@ Options:
   --clone-dir <path>         Local clone directory (default: /opt/gentoo-ddubs).
   --video-cards "<cards>"    Override detected VIDEO_CARDS value.
   --include-system-files     Also copy system/etc/fstab and system/etc/locale.gen.
+  --ly-only                  Only install/configure ly, skip clone and config sync.
   --keep-clone               Keep clone directory after apply (default).
   --remove-clone             Remove clone directory after apply.
   --dry-run, -n              Show planned actions without writing changes.
@@ -38,6 +40,7 @@ Options:
 
 Behavior:
   If no login manager is detected, this script installs and enables x11-misc/ly.
+  --ly-only forces ly setup without running the full config clone flow.
 EOF
 }
 
@@ -211,6 +214,63 @@ login_manager_atom_installed() {
   return 1
 }
 
+ensure_ly_package_use_for_init() {
+  local ly_use_file="/etc/portage/package.use/ly-login-manager"
+  local ly_flags="x11-misc/ly X"
+
+  if command -v systemctl >/dev/null 2>&1; then
+    ly_flags="x11-misc/ly X systemd"
+  fi
+
+  if [[ "$DRY_RUN" = "true" ]]; then
+    say "Would write ${ly_use_file}: ${ly_flags}"
+    return 0
+  fi
+
+  mkdir -p /etc/portage/package.use
+  printf '%s\n' "$ly_flags" >"$ly_use_file"
+}
+
+detect_ly_systemd_unit() {
+  local units
+  units="$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}')"
+  if printf '%s\n' "$units" | grep -qx 'ly.service'; then
+    printf 'ly.service\n'
+    return 0
+  fi
+  if printf '%s\n' "$units" | grep -qx 'display-manager.service'; then
+    printf 'display-manager.service\n'
+    return 0
+  fi
+  return 1
+}
+
+enable_ly_systemd_service() {
+  local unit target_unit
+  run_cmd systemctl daemon-reload
+
+  if unit="$(detect_ly_systemd_unit)"; then
+    run_cmd systemctl enable "$unit"
+    say "Enabled ${unit}."
+    return 0
+  fi
+
+  if [[ -f /usr/lib/systemd/system/ly.service ]]; then
+    target_unit="/usr/lib/systemd/system/ly.service"
+  elif [[ -f /lib/systemd/system/ly.service ]]; then
+    target_unit="/lib/systemd/system/ly.service"
+  else
+    say "WARN: ly installed but no systemd unit file found."
+    return 1
+  fi
+
+  run_cmd mkdir -p /etc/systemd/system
+  run_cmd ln -sfn "$target_unit" /etc/systemd/system/display-manager.service
+  run_cmd systemctl daemon-reload
+  run_cmd systemctl enable display-manager.service
+  say "Enabled display-manager.service (linked to ly.service)."
+}
+
 any_login_manager_detected() {
   local atom
   local known_login_managers=(
@@ -240,19 +300,38 @@ any_login_manager_detected() {
 }
 
 ensure_ly_if_no_login_manager() {
+  if login_manager_atom_installed "x11-misc/ly"; then
+    ensure_ly_installed_and_enabled
+    return 0
+  fi
   if any_login_manager_detected; then
     say "Existing login manager detected; skipping ly installation."
     return 0
   fi
-
   say "No login manager detected; installing ly..."
-  run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y x11-misc/ly app-misc/cmatrix
+  ensure_ly_installed_and_enabled
+}
+
+ensure_ly_installed_and_enabled() {
+  ensure_ly_package_use_for_init
+  if login_manager_atom_installed "x11-misc/ly"; then
+    say "ly package already installed; ensuring service configuration."
+  else
+    say "Installing ly..."
+    run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y x11-misc/ly app-misc/cmatrix
+  fi
 
   if command -v systemctl >/dev/null 2>&1; then
-    run_cmd systemctl enable ly.service
-    say "Enabled ly.service."
+    if ! enable_ly_systemd_service; then
+      say "Rebuilding ly with current USE flags and retrying service enable..."
+      run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y --oneshot x11-misc/ly
+      enable_ly_systemd_service || say "WARN: Could not enable ly via systemd after rebuild."
+    fi
+  elif command -v rc-update >/dev/null 2>&1 && [[ -x /etc/init.d/ly ]]; then
+    run_cmd rc-update add ly default
+    say "Enabled ly in OpenRC default runlevel."
   else
-    say "WARN: systemctl not found; ly installed but service was not enabled."
+    say "WARN: Neither systemd nor OpenRC service tooling found; ly installed but not enabled."
   fi
 }
 
@@ -289,6 +368,10 @@ parse_args() {
         INCLUDE_SYSTEM_FILES="true"
         shift
         ;;
+      --ly-only)
+        LY_ONLY="true"
+        shift
+        ;;
       --keep-clone)
         KEEP_CLONE="true"
         shift
@@ -315,6 +398,13 @@ parse_args() {
 main() {
   parse_args "$@"
   need_root "$@"
+
+  if [[ "$LY_ONLY" = "true" ]]; then
+    say "Running in ly-only mode..."
+    ensure_ly_installed_and_enabled
+    say "Done (ly-only mode)."
+    return 0
+  fi
 
   command -v git >/dev/null 2>&1 || fail "git is required"
   command -v rsync >/dev/null 2>&1 || fail "rsync is required"

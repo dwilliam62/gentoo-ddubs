@@ -18,14 +18,59 @@ require_cmd() {
     exit 1
   fi
 }
+
+nix_cmd_path() {
+  if command -v nix >/dev/null 2>&1; then
+    command -v nix
+    return 0
+  fi
+
+  if [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
+    printf '/nix/var/nix/profiles/default/bin/nix\n'
+    return 0
+  fi
+
+  return 1
+}
+
+nix_install_healthy() {
+  local nix_bin
+  nix_bin="$(nix_cmd_path 2>/dev/null || true)"
+  [[ -n "$nix_bin" ]] || return 1
+  "$nix_bin" --version >/dev/null 2>&1
+}
+
+purge_existing_nix_install() {
+  echo "[WARN] Detected broken or partial Nix installation. Purging existing Nix state..."
+
+  if command -v systemctl >/dev/null 2>&1; then
+    sudo systemctl stop nix-daemon.service nix-daemon.socket 2>/dev/null || true
+  fi
+
+  sudo pkill -f '[n]ix-daemon' 2>/dev/null || true
+  sudo pkill -f '/nix/store/.*/bin/nix' 2>/dev/null || true
+
+  sudo rm -rf /nix /etc/nix
+  rm -rf "${HOME}/.nix-profile" "${HOME}/.nix-defexpr" "${HOME}/.nix-channels" 2>/dev/null || true
+
+  if command -v hash >/dev/null 2>&1; then
+    hash -r || true
+  fi
+}
 ensure_nix_with_flakes() {
   local nix_conf="/etc/nix/nix.conf"
   local nix_features="extra-experimental-features = nix-command flakes"
+  local url="${NIX_INSTALL_URL:-https://nixos.org/nix/install}"
+  local flags="${NIX_INSTALL_FLAGS:---daemon --yes}"
 
-  if ! command -v nix >/dev/null 2>&1; then
+  if nix_install_healthy; then
+    echo "[OK] Nix installation detected and healthy."
+  else
+    if [[ -d /nix || -e /etc/nix || -x /nix/var/nix/profiles/default/bin/nix ]]; then
+      purge_existing_nix_install
+    fi
+
     echo "[INFO] Installing Nix (daemon) ..."
-    local url="${NIX_INSTALL_URL:-https://nixos.org/nix/install}"
-    local flags="${NIX_INSTALL_FLAGS:---daemon --yes}"
     if curl -fsSL "$url" | sudo sh -s -- $flags; then
       echo "[INFO] Nix installed. Enabling flakes..."
       sudo mkdir -p /etc/nix
@@ -39,8 +84,7 @@ ensure_nix_with_flakes() {
       exit 1
     fi
   fi
-
-  # Ensure flakes enabled if nix already installed
+  # Ensure flakes enabled if nix already installed and healthy
   sudo mkdir -p /etc/nix
   if ! sudo grep -q "^extra-experimental-features" "$nix_conf" 2>/dev/null; then
     echo "$nix_features" | sudo tee -a "$nix_conf" >/dev/null
@@ -147,8 +191,8 @@ xfce-base/tumbler jpeg
 gui-libs/gtk-layer-shell introspection
 # kitty Wayland build
 x11-terms/kitty wayland
-# ly display manager should enumerate X sessions
-x11-misc/ly X
+# ly display manager should enumerate X sessions and install systemd unit
+x11-misc/ly X systemd
 # mpv/vlc dependency
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
@@ -354,9 +398,52 @@ configure_ly() {
       -e 's/^bigclock *=.*/bigclock = true/' /etc/ly/config.ini
   fi
 
-  # Enable the service via systemd
-  echo "[INFO] Enabling ly.service via systemd"
-  sudo systemctl enable ly.service
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "[WARN] systemctl not found; ly installed but not enabled via systemd."
+    return 0
+  fi
+
+  local units unit target_unit
+  sudo systemctl daemon-reload || true
+  units="$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}')"
+  if printf '%s\n' "$units" | grep -qx 'ly.service'; then
+    unit="ly.service"
+  elif printf '%s\n' "$units" | grep -qx 'display-manager.service'; then
+    unit="display-manager.service"
+  else
+    if [[ -f /usr/lib/systemd/system/ly.service ]]; then
+      target_unit="/usr/lib/systemd/system/ly.service"
+    elif [[ -f /lib/systemd/system/ly.service ]]; then
+      target_unit="/lib/systemd/system/ly.service"
+    else
+      echo "[WARN] No ly systemd unit found; rebuilding ly with current USE flags..."
+      install_pkg x11-misc/ly
+      sudo systemctl daemon-reload || true
+      units="$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}')"
+      if printf '%s\n' "$units" | grep -qx 'ly.service'; then
+        unit="ly.service"
+      elif printf '%s\n' "$units" | grep -qx 'display-manager.service'; then
+        unit="display-manager.service"
+      elif [[ -f /usr/lib/systemd/system/ly.service ]]; then
+        target_unit="/usr/lib/systemd/system/ly.service"
+      elif [[ -f /lib/systemd/system/ly.service ]]; then
+        target_unit="/lib/systemd/system/ly.service"
+      else
+        echo "[WARN] ly installed but no enable-able systemd unit exists."
+        return 0
+      fi
+    fi
+
+    if [[ -n "${target_unit:-}" ]]; then
+      sudo mkdir -p /etc/systemd/system
+      sudo ln -sfn "$target_unit" /etc/systemd/system/display-manager.service
+      sudo systemctl daemon-reload || true
+      unit="display-manager.service"
+    fi
+  fi
+
+  echo "[INFO] Enabling ${unit} via systemd"
+  sudo systemctl enable "$unit"
 }
 
 configure_pipewire() {
