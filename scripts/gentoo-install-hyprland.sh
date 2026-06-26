@@ -535,15 +535,30 @@ ensure_pamixer_cxx17_fix() {
 CXXFLAGS="${CXXFLAGS} -std=c++17"
 EOF
 
-  # Create the package.env directory if needed
-  sudo mkdir -p /etc/portage/package.env
+  # Handle both valid Portage layouts:
+  # 1) /etc/portage/package.env as a file
+  # 2) /etc/portage/package.env as a directory of snippets
+  local package_env_path="/etc/portage/package.env"
+  local pamixer_line="media-sound/pamixer cxx17-fix"
+  local pamixer_env
+
+  if [[ -d "${package_env_path}" ]]; then
+    pamixer_env="${package_env_path}/pamixer"
+  elif [[ -f "${package_env_path}" ]]; then
+    pamixer_env="${package_env_path}"
+  elif [[ -e "${package_env_path}" ]]; then
+    echo "[WARN] ${package_env_path} exists but is neither a regular file nor a directory; skipping pamixer package.env update."
+    return 0
+  else
+    sudo mkdir -p "${package_env_path}"
+    pamixer_env="${package_env_path}/pamixer"
+  fi
 
   # Link pamixer to the fix, but avoid duplicating the line on re-runs
-  local pamixer_env="/etc/portage/package.env/pamixer"
-  if [[ -f "${pamixer_env}" ]] && grep -q 'media-sound/pamixer' "${pamixer_env}"; then
+  if sudo grep -qF "${pamixer_line}" "${pamixer_env}" 2>/dev/null; then
     echo "[INFO] pamixer package.env entry already present; leaving as-is."
   else
-    echo "media-sound/pamixer cxx17-fix" | sudo tee -a "${pamixer_env}" >/dev/null
+    echo "${pamixer_line}" | sudo tee -a "${pamixer_env}" >/dev/null
   fi
 }
 
