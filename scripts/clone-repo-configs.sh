@@ -35,6 +35,9 @@ Options:
   --remove-clone             Remove clone directory after apply.
   --dry-run, -n              Show planned actions without writing changes.
   --help, -h                 Show this help.
+
+Behavior:
+  If no login manager is detected, this script installs and enables x11-misc/ly.
 EOF
 }
 
@@ -176,6 +179,67 @@ set_gpu_specific_mesa_flags() {
   printf 'media-libs/mesa %s\n' "${flags[*]}" >"$mesa_file"
 }
 
+login_manager_atom_installed() {
+  local atom="$1"
+
+  if command -v qlist >/dev/null 2>&1; then
+    qlist -I "$atom" >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v portageq >/dev/null 2>&1; then
+    portageq match / "$atom" 2>/dev/null | grep -q '.'
+    return $?
+  fi
+
+  return 1
+}
+
+any_login_manager_detected() {
+  local atom
+  local known_login_managers=(
+    "x11-misc/ly"
+    "gnome-base/gdm"
+    "x11-misc/sddm"
+    "x11-misc/lightdm"
+    "lxde-base/lxdm"
+    "x11-apps/xdm"
+  )
+
+  for atom in "${known_login_managers[@]}"; do
+    if login_manager_atom_installed "$atom"; then
+      say "Detected installed login manager package: ${atom}"
+      return 0
+    fi
+  done
+
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -Eq '^(display-manager|ly|gdm|sddm|lightdm|lxdm|xdm)\.service$'; then
+      say "Detected login manager service unit on system."
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+ensure_ly_if_no_login_manager() {
+  if any_login_manager_detected; then
+    say "Existing login manager detected; skipping ly installation."
+    return 0
+  fi
+
+  say "No login manager detected; installing ly..."
+  run_cmd emerge -v --ask=n x11-misc/ly app-misc/cmatrix
+
+  if command -v systemctl >/dev/null 2>&1; then
+    run_cmd systemctl enable ly.service
+    say "Enabled ly.service."
+  else
+    say "WARN: systemctl not found; ly installed but service was not enabled."
+  fi
+}
+
 clone_or_update_repo() {
   if [[ -d "${CLONE_DIR}/.git" ]]; then
     say "Updating existing clone at ${CLONE_DIR}"
@@ -268,6 +332,8 @@ main() {
   set_makeconf_video_cards "/etc/portage/make.conf" "$cards"
   set_gpu_specific_mesa_flags "$cards"
   say "GPU-aware config applied with VIDEO_CARDS=${cards}"
+
+  ensure_ly_if_no_login_manager
 
   if [[ "$KEEP_CLONE" = "false" ]]; then
     run_cmd rm -rf "$CLONE_DIR"
