@@ -4,6 +4,8 @@ set -euo pipefail
 YAZI_ATOM="=app-misc/yazi-9999::guru"
 KEYWORD_ENTRY="=app-misc/yazi-9999::guru **"
 KEYWORDS_PATH="/etc/portage/package.accept_keywords"
+GURU_REPO_CONF="/etc/portage/repos.conf/guru.conf"
+GURU_SYNC_URI="https://gitweb.gentoo.org/repo/proj/guru.git"
 
 say() {
   printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"
@@ -144,9 +146,41 @@ need_root() {
     exec sudo -E bash "$0" "$@"
   fi
 }
+ensure_guru_repo() {
+  if ! command -v eselect >/dev/null 2>&1; then
+    say "Installing app-eselect/eselect-repository for guru overlay management..."
+    emerge --ask=n app-eselect/eselect-repository
+  fi
+
+  if eselect repository list 2>/dev/null | awk '/\*/ {print $2}' | grep -qx "guru"; then
+    say "guru overlay already enabled."
+  elif eselect repository list 2>/dev/null | awk 'NR>1 {print $2}' | grep -qx "guru"; then
+    say "Enabling existing guru overlay entry..."
+    eselect repository enable guru || true
+  else
+    say "Creating fallback repos.conf entry for guru overlay..."
+    install -d /etc/portage/repos.conf
+    cat >"$GURU_REPO_CONF" <<EOF
+[guru]
+location = /var/db/repos/guru
+sync-type = git
+sync-uri = ${GURU_SYNC_URI}
+auto-sync = yes
+EOF
+  fi
+
+  if command -v emaint >/dev/null 2>&1; then
+    say "Syncing guru metadata..."
+    emaint sync -r guru || say "WARN: Unable to sync guru via emaint."
+  else
+    say "Syncing repositories (emerge --sync) to pick up guru..."
+    emerge --sync || say "WARN: emerge --sync failed while refreshing overlays."
+  fi
+}
 
 install_yazi() {
   need_root "$@"
+  ensure_guru_repo
   ensure_keyword_fix
   say "Installing/updating $YAZI_ATOM ..."
   emerge --oneshot "$YAZI_ATOM"

@@ -9,6 +9,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 DDUBS_ROOT="$(realpath "${SCRIPT_DIR}/..")"
 OXWM_REPO_URL="https://github.com/tonybanters/oxwm"
 OXWM_DIR="/opt/oxwm"
+HYPROVERLAY_REPO_CONF="/etc/portage/repos.conf/hyproverlay.conf"
+HYPROVERLAY_SYNC_URI="https://codeberg.org/hyproverlay/hyproverlay.git"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -45,7 +47,7 @@ ensure_nix_with_flakes() {
   fi
 }
 ensure_hyproverlay_repo() {
-  echo "[INFO] Ensuring hyproverlay repository is enabled"
+  echo "[INFO] Ensuring hyproverlay repository is enabled for latest Hyprland packages"
 
   if ! command -v eselect >/dev/null 2>&1; then
     echo "[WARN] eselect not found; cannot manage overlays automatically."
@@ -59,15 +61,27 @@ ensure_hyproverlay_repo() {
 
   if eselect repository list 2>/dev/null | awk '/\*/ {print $2}' | grep -qx "hyproverlay"; then
     echo "[OK] hyproverlay is already enabled."
-    return 0
+  elif eselect repository list 2>/dev/null | awk 'NR>1 {print $2}' | grep -qx "hyproverlay"; then
+    echo "[INFO] Enabling existing hyproverlay entry..."
+    sudo eselect repository enable hyproverlay || true
+  else
+    echo "[INFO] Adding hyproverlay repo config file (fallback path)..."
+    sudo mkdir -p /etc/portage/repos.conf
+    sudo tee "${HYPROVERLAY_REPO_CONF}" >/dev/null <<EOF
+[hyproverlay]
+location = /var/db/repos/hyproverlay
+sync-type = git
+sync-uri = ${HYPROVERLAY_SYNC_URI}
+auto-sync = yes
+EOF
   fi
 
-  if eselect repository list 2>/dev/null | awk 'NR>1 {print $2}' | grep -qx "hyproverlay"; then
-    echo "[INFO] Enabling existing hyproverlay entry..."
-    sudo eselect repository enable hyproverlay
+  if command -v emaint >/dev/null 2>&1; then
+    echo "[INFO] Syncing hyproverlay metadata..."
+    sudo emaint sync -r hyproverlay || echo "[WARN] Failed to sync hyproverlay (continuing)."
   else
-    echo "[INFO] Adding and enabling hyproverlay..."
-    sudo eselect repository enable hyproverlay
+    echo "[INFO] Syncing repositories (emerge --sync) to pick up hyproverlay..."
+    sudo emerge --sync || echo "[WARN] emerge --sync failed (continuing)."
   fi
 }
 
@@ -140,29 +154,41 @@ x11-misc/ly X
 EOF
 }
 ensure_video_cards() {
-  echo "[INFO] Ensuring VIDEO_CARDS includes virgl and detecting hardware..."
+  echo "[INFO] Ensuring VIDEO_CARDS reflects detected GPU hardware..."
   local mc="/etc/portage/make.conf"
   sudo touch "$mc"
-
-  # Default to virgl for your current VM setup
-  local cards="virgl"
-
-  # Detection logic for future HW moves
-  if lspci | grep -qi "nvidia"; then
-    cards="$cards nvidia"
-  elif lspci | grep -qi "amd"; then
-    cards="$cards amdgpu radeonsi"
-  elif lspci | grep -qi "intel"; then
-    cards="$cards intel i915"
+  local detected=()
+  if command -v lspci >/dev/null 2>&1; then
+    if lspci | grep -qiE "virtio|qxl|vmware"; then
+      detected+=("virgl")
+    fi
+    if lspci | grep -qi "nvidia"; then
+      detected+=("nvidia")
+    fi
+    if lspci | grep -qiE "amd|ati"; then
+      detected+=("amdgpu" "radeonsi")
+    fi
+    if lspci | grep -qi "intel"; then
+      detected+=("intel" "i915")
+    fi
+  else
+    echo "[WARN] lspci not found; defaulting VIDEO_CARDS to virgl."
   fi
+
+  if [[ ${#detected[@]} -eq 0 ]]; then
+    detected=("virgl")
+  fi
+  local cards
+  cards="$(printf '%s\n' "${detected[@]}" | awk 'NF && !seen[$0]++' | paste -sd' ' -)"
 
   # Update make.conf if the line exists, otherwise append
   if grep -q '^VIDEO_CARDS=' "$mc"; then
-    # This replaces the line entirely with our detected list
     sudo sed -i "s/^VIDEO_CARDS=.*/VIDEO_CARDS=\"$cards\"/" "$mc"
   else
     echo "VIDEO_CARDS=\"$cards\"" | sudo tee -a "$mc" >/dev/null
   fi
+
+  echo "[OK] VIDEO_CARDS set to: $cards"
 }
 
 pkg_installed() {
@@ -445,6 +471,12 @@ ensure_gdk_pixbuf_loaders_cache() {
   fi
 }
 ensure_kernel_postinst_efi_update() {
+  if command -v efibootmgr >/dev/null 2>&1; then
+    if sudo efibootmgr -v 2>/dev/null | grep -qi 'grub'; then
+      echo "[INFO] GRUB-managed EFI detected; skipping EFI copy postinst hook."
+      return 0
+    fi
+  fi
   echo "[INFO] Ensuring kernel postinst hook updates EFI boot files"
 
   # Create the directory if it doesn't exist
@@ -482,6 +514,108 @@ EOF
 
   # Make it executable
   sudo chmod +x /etc/kernel/postinst.d/99-efi-update.sh
+}
+
+detect_efi_mountpoint() {
+  local candidate
+  for candidate in /boot/efi /efi /boot; do
+    if [[ -d "$candidate" ]] && mountpoint -q "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+ensure_kernel_install_layout_grub() {
+  local conf="/etc/kernel/install.conf"
+  sudo mkdir -p /etc/kernel
+
+  if [[ -f "$conf" ]] && grep -q '^layout=' "$conf"; then
+    sudo sed -i 's/^layout=.*/layout=grub/' "$conf"
+  elif [[ -f "$conf" ]]; then
+    printf '\nlayout=grub\n' | sudo tee -a "$conf" >/dev/null
+  else
+    echo 'layout=grub' | sudo tee "$conf" >/dev/null
+  fi
+}
+
+ensure_grub_bootloader_when_efi_manager_detected() {
+  echo "[INFO] Checking EFI boot manager state..."
+
+  if [[ ! -d /sys/firmware/efi ]]; then
+    echo "[INFO] System is not booted in UEFI mode; skipping EFI manager check."
+    return 0
+  fi
+
+  install_if_missing sys-boot/efibootmgr
+  install_if_missing sys-boot/grub
+
+  if ! command -v efibootmgr >/dev/null 2>&1; then
+    echo "[WARN] efibootmgr unavailable; cannot inspect EFI entries."
+    return 0
+  fi
+
+  local boot_entries
+  boot_entries="$(sudo efibootmgr -v 2>/dev/null || true)"
+  if [[ -z "$boot_entries" ]]; then
+    echo "[WARN] No EFI entries returned; skipping conversion check."
+    return 0
+  fi
+
+  if echo "$boot_entries" | grep -qi 'grub'; then
+    echo "[OK] GRUB EFI entry already present."
+    ensure_kernel_install_layout_grub
+    return 0
+  fi
+
+  if ! echo "$boot_entries" | grep -qiE 'Linux Boot Manager|systemd'; then
+    echo "[INFO] EFI entries do not indicate a systemd EFI manager takeover."
+    return 0
+  fi
+
+  local efi_dir
+  if ! efi_dir="$(detect_efi_mountpoint)"; then
+    echo "[WARN] Could not determine mounted EFI directory (/boot/efi, /efi, /boot)."
+    return 0
+  fi
+
+  local target
+  case "$(uname -m)" in
+    x86_64) target="x86_64-efi" ;;
+    aarch64|arm64) target="arm64-efi" ;;
+    *)
+      echo "[WARN] Unsupported architecture for automated grub-install: $(uname -m)"
+      return 0
+      ;;
+  esac
+
+  echo "[INFO] EFI manager detected without GRUB entry; installing GRUB bootloader..."
+  if sudo grub-install --target="$target" --efi-directory="$efi_dir" --bootloader-id=GentooGRUB --recheck; then
+    ensure_kernel_install_layout_grub
+    sudo grub-mkconfig -o /boot/grub/grub.cfg
+    if [[ -f /etc/kernel/postinst.d/99-efi-update.sh ]]; then
+      sudo rm -f /etc/kernel/postinst.d/99-efi-update.sh
+      echo "[INFO] Removed EFI copy hook; GRUB now manages boot entries."
+    fi
+    echo "[OK] Converted EFI boot flow to GRUB."
+  else
+    echo "[WARN] grub-install failed; manual bootloader conversion may be required."
+  fi
+}
+
+install_latest_yazi_from_script() {
+  local yazi_updater="${SCRIPT_DIR}/update-yazi.sh"
+
+  if [[ ! -f "$yazi_updater" ]]; then
+    echo "[WARN] Missing ${yazi_updater}; skipping latest Yazi install."
+    return 0
+  fi
+
+  echo "[INFO] Installing latest Yazi from guru via update-yazi.sh..."
+  if ! sudo bash "$yazi_updater" --install; then
+    echo "[WARN] update-yazi.sh failed; keeping repository Yazi package state."
+  fi
 }
 
 configure_shell_runtime_exports() {
@@ -683,12 +817,14 @@ ensure_use_flags
 ensure_video_cards
 ensure_gentoo_rsync_repo
 ensure_hyproverlay_repo
+ensure_grub_bootloader_when_efi_manager_detected
 ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
 ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
 install_if_missing dev-lang/zig
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
+install_latest_yazi_from_script
 install_list "Kernel maintenance" "${KERNEL_MAINT_PACKAGES[@]}"
 ensure_gdk_pixbuf_loaders_cache
 install_list "OxWM X11 extras" "${OXWM_PACKAGES[@]}"
