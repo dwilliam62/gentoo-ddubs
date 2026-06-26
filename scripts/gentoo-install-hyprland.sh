@@ -801,6 +801,8 @@ HYPR_PACKAGES=(
   gui-apps/clipman
   gui-apps/grim
   gui-apps/quickshell
+  # Required by newer hyprpaper releases during cmake configure
+  gui-libs/hyprwire::hyproverlay
   gui-apps/hypridle::hyproverlay
   gui-apps/hyprlock::hyproverlay
   gui-apps/hyprpaper::hyproverlay
