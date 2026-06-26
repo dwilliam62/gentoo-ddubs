@@ -156,6 +156,7 @@ EOF
 ensure_video_cards() {
   echo "[INFO] Ensuring VIDEO_CARDS reflects detected GPU hardware..."
   local mc="/etc/portage/make.conf"
+  local libdrm_use_file="/etc/portage/package.use/libdrm-gpu-cards"
   sudo touch "$mc"
   local detected=()
   if command -v lspci >/dev/null 2>&1; then
@@ -186,6 +187,14 @@ ensure_video_cards() {
     sudo sed -i "s/^VIDEO_CARDS=.*/VIDEO_CARDS=\"$cards\"/" "$mc"
   else
     echo "VIDEO_CARDS=\"$cards\"" | sudo tee -a "$mc" >/dev/null
+  fi
+  if printf ' %s ' "$cards" | grep -qE ' (amdgpu|radeonsi) '; then
+    sudo mkdir -p /etc/portage/package.use
+    echo '>=x11-libs/libdrm-2.4.134 video_cards_radeon' | sudo tee "$libdrm_use_file" >/dev/null
+    echo "[OK] Added AMD libdrm USE compatibility: $libdrm_use_file"
+  elif [[ -f "$libdrm_use_file" ]]; then
+    sudo rm -f "$libdrm_use_file"
+    echo "[INFO] Removed stale AMD libdrm USE compatibility file."
   fi
 
   echo "[OK] VIDEO_CARDS set to: $cards"

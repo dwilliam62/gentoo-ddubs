@@ -155,6 +155,8 @@ set_makeconf_video_cards() {
 set_gpu_specific_mesa_flags() {
   local cards="$1"
   local mesa_file="/etc/portage/package.use/mesa-gpu-cards"
+  local libdrm_file="/etc/portage/package.use/libdrm-gpu-cards"
+  local needs_amd_libdrm_fix="false"
   local flags=()
   local card
 
@@ -164,6 +166,9 @@ set_gpu_specific_mesa_flags() {
         flags+=("video_cards_${card}")
         ;;
     esac
+    case "$card" in
+      amdgpu|radeonsi) needs_amd_libdrm_fix="true" ;;
+    esac
   done
 
   if [[ ${#flags[@]} -eq 0 ]]; then
@@ -172,11 +177,22 @@ set_gpu_specific_mesa_flags() {
 
   if [[ "$DRY_RUN" = "true" ]]; then
     say "Would write ${mesa_file}: media-libs/mesa ${flags[*]}"
+    if [[ "$needs_amd_libdrm_fix" = "true" ]]; then
+      say "Would write ${libdrm_file}: >=x11-libs/libdrm-2.4.134 video_cards_radeon"
+    elif [[ -f "$libdrm_file" ]]; then
+      say "Would remove ${libdrm_file} (AMD-specific fix not needed)"
+    fi
     return 0
   fi
 
   mkdir -p /etc/portage/package.use
   printf 'media-libs/mesa %s\n' "${flags[*]}" >"$mesa_file"
+
+  if [[ "$needs_amd_libdrm_fix" = "true" ]]; then
+    printf '>=x11-libs/libdrm-2.4.134 video_cards_radeon\n' >"$libdrm_file"
+  else
+    rm -f "$libdrm_file"
+  fi
 }
 
 login_manager_atom_installed() {
@@ -230,7 +246,7 @@ ensure_ly_if_no_login_manager() {
   fi
 
   say "No login manager detected; installing ly..."
-  run_cmd emerge -v --ask=n x11-misc/ly app-misc/cmatrix
+  run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y x11-misc/ly app-misc/cmatrix
 
   if command -v systemctl >/dev/null 2>&1; then
     run_cmd systemctl enable ly.service
