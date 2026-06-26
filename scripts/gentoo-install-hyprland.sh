@@ -794,6 +794,7 @@ HYPR_PACKAGES=(
   app-shells/starship
   app-shells/zoxide
   dev-lang/python
+  dev-util/hyprwayland-scanner
   dev-libs/libdbusmenu
   dev-libs/newt
   gui-apps/awww
