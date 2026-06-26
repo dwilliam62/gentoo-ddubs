@@ -233,9 +233,14 @@ ensure_ly_package_use_for_init() {
 
 detect_ly_systemd_unit() {
   local units
+  local ly_tty="${LY_TTY:-tty2}"
   units="$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}')"
   if printf '%s\n' "$units" | grep -qx 'ly.service'; then
     printf 'ly.service\n'
+    return 0
+  fi
+  if printf '%s\n' "$units" | grep -qx 'ly@.service'; then
+    printf 'ly@%s.service\n' "$ly_tty"
     return 0
   fi
   if printf '%s\n' "$units" | grep -qx 'display-manager.service'; then
@@ -246,7 +251,7 @@ detect_ly_systemd_unit() {
 }
 
 enable_ly_systemd_service() {
-  local unit target_unit
+  local unit target_unit ly_tty="${LY_TTY:-tty2}"
   run_cmd systemctl daemon-reload
 
   if unit="$(detect_ly_systemd_unit)"; then
@@ -259,6 +264,10 @@ enable_ly_systemd_service() {
     target_unit="/usr/lib/systemd/system/ly.service"
   elif [[ -f /lib/systemd/system/ly.service ]]; then
     target_unit="/lib/systemd/system/ly.service"
+  elif [[ -f /usr/lib/systemd/system/ly@.service || -f /lib/systemd/system/ly@.service ]]; then
+    run_cmd systemctl enable "ly@${ly_tty}.service"
+    say "Enabled ly@${ly_tty}.service."
+    return 0
   else
     say "WARN: ly installed but no systemd unit file found."
     return 1
@@ -290,7 +299,7 @@ any_login_manager_detected() {
   done
 
   if command -v systemctl >/dev/null 2>&1; then
-    if systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -Eq '^(display-manager|ly|gdm|sddm|lightdm|lxdm|xdm)\.service$'; then
+    if systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}' | grep -Eq '^(display-manager|ly|ly@|gdm|sddm|lightdm|lxdm|xdm)(@.*)?\.service$'; then
       say "Detected login manager service unit on system."
       return 0
     fi

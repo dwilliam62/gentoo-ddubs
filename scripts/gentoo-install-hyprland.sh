@@ -77,8 +77,11 @@ ensure_nix_with_flakes() {
       if ! sudo grep -q "^extra-experimental-features" "$nix_conf" 2>/dev/null; then
         echo "$nix_features" | sudo tee -a "$nix_conf" >/dev/null
       fi
-      echo "[WARN] Nix requires a new shell. Please restart your shell and re-run this script."
-      exit 0
+      if ! nix_install_healthy; then
+        echo "[ERROR] Nix installation completed but nix is still not healthy."
+        exit 1
+      fi
+      echo "[INFO] Nix installed and healthy; continuing installer. You may still want a new shell later for interactive nix usage."
     else
       echo "[ERROR] Nix install failed."
       exit 1
@@ -403,11 +406,13 @@ configure_ly() {
     return 0
   fi
 
-  local units unit target_unit
+  local units unit target_unit ly_tty="${LY_TTY:-tty2}"
   sudo systemctl daemon-reload || true
   units="$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}')"
   if printf '%s\n' "$units" | grep -qx 'ly.service'; then
     unit="ly.service"
+  elif printf '%s\n' "$units" | grep -qx 'ly@.service'; then
+    unit="ly@${ly_tty}.service"
   elif printf '%s\n' "$units" | grep -qx 'display-manager.service'; then
     unit="display-manager.service"
   else
@@ -415,6 +420,8 @@ configure_ly() {
       target_unit="/usr/lib/systemd/system/ly.service"
     elif [[ -f /lib/systemd/system/ly.service ]]; then
       target_unit="/lib/systemd/system/ly.service"
+    elif [[ -f /usr/lib/systemd/system/ly@.service || -f /lib/systemd/system/ly@.service ]]; then
+      unit="ly@${ly_tty}.service"
     else
       echo "[WARN] No ly systemd unit found; rebuilding ly with current USE flags..."
       install_pkg x11-misc/ly
@@ -422,12 +429,16 @@ configure_ly() {
       units="$(systemctl list-unit-files --type=service --no-legend 2>/dev/null | awk '{print $1}')"
       if printf '%s\n' "$units" | grep -qx 'ly.service'; then
         unit="ly.service"
+      elif printf '%s\n' "$units" | grep -qx 'ly@.service'; then
+        unit="ly@${ly_tty}.service"
       elif printf '%s\n' "$units" | grep -qx 'display-manager.service'; then
         unit="display-manager.service"
       elif [[ -f /usr/lib/systemd/system/ly.service ]]; then
         target_unit="/usr/lib/systemd/system/ly.service"
       elif [[ -f /lib/systemd/system/ly.service ]]; then
         target_unit="/lib/systemd/system/ly.service"
+      elif [[ -f /usr/lib/systemd/system/ly@.service || -f /lib/systemd/system/ly@.service ]]; then
+        unit="ly@${ly_tty}.service"
       else
         echo "[WARN] ly installed but no enable-able systemd unit exists."
         return 0
