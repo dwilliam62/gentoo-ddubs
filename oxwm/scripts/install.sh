@@ -13,7 +13,8 @@ fi
 OXWM_REPO_URL="${OXWM_REPO_URL:-https://github.com/tonybanters/oxwm}"
 OXWM_SOURCE_DIR="${OXWM_SOURCE_DIR:-${TARGET_HOME}/src/oxwm}"
 OXWM_CONFIG_DIR="${OXWM_CONFIG_DIR:-${TARGET_HOME}/.config/oxwm}"
-OXWM_DESKTOP_DIR="${OXWM_DESKTOP_DIR:-/usr/share/applications}"
+OXWM_DESKTOP_DIR="${OXWM_DESKTOP_DIR:-/usr/share/xsessions}"
+OXWM_APPLICATIONS_DIR="${OXWM_APPLICATIONS_DIR:-/usr/share/applications}"
 
 ZIG_REQUIRED_VERSION="${ZIG_REQUIRED_VERSION:-0.16.0}"
 ZIG_INSTALL_ROOT="${ZIG_INSTALL_ROOT:-/opt/zig}"
@@ -48,7 +49,7 @@ Options:
   --help         Show this help.
 
 Environment overrides:
-  OXWM_REPO_URL, OXWM_SOURCE_DIR, OXWM_CONFIG_DIR, OXWM_DESKTOP_DIR
+  OXWM_REPO_URL, OXWM_SOURCE_DIR, OXWM_CONFIG_DIR, OXWM_DESKTOP_DIR, OXWM_APPLICATIONS_DIR
   ZIG_REQUIRED_VERSION, ZIG_INSTALL_ROOT, ZIG_COMPAT_SYMLINK, ZIG_LOCAL_TARBALL
 EOF
 }
@@ -194,37 +195,52 @@ zig_download_triplet() {
       ;;
   esac
 
-  printf '%s-%s\n' "${os}" "${arch}"
+  printf '%s-%s\n' "${arch}" "${os}"
+}
+zig_archive_name() {
+  printf 'zig-%s-%s.tar.xz\n' "$(zig_download_triplet)" "${ZIG_REQUIRED_VERSION}"
+}
+zig_download_url() {
+  printf 'https://ziglang.org/download/%s/%s\n' "${ZIG_REQUIRED_VERSION}" "$(zig_archive_name)"
 }
 zig_local_archive_path() {
-  local os arch
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
-
-  case "${arch}" in
-    x86_64|amd64) arch="x86_64" ;;
-    aarch64|arm64) arch="aarch64" ;;
-    riscv64) arch="riscv64" ;;
-  esac
-
-  printf '%s/zig-%s-%s-%s.tar.xz\n' "${LOCAL_OXWM_DIR}" "${arch}" "${os}" "${ZIG_REQUIRED_VERSION}"
+  printf '%s/%s\n' "${LOCAL_OXWM_DIR}" "$(zig_archive_name)"
 }
 
 install_zig_toolchain() {
-  local archive_path tmp_dir extracted_dir top_dir
-  archive_path="${ZIG_LOCAL_TARBALL:-$(zig_local_archive_path)}"
-  [[ -f "${archive_path}" ]] || die "Local Zig tarball not found at ${archive_path}; place it in ${LOCAL_OXWM_DIR} or set ZIG_LOCAL_TARBALL"
+  local archive_path local_cache_path archive_source url tmp_dir extracted_dir top_dir download_tmp
+  local_cache_path="$(zig_local_archive_path)"
+  archive_path="${ZIG_LOCAL_TARBALL:-${local_cache_path}}"
+  url="$(zig_download_url)"
   tmp_dir="$(mktemp -d)"
 
-  log "Installing Zig ${ZIG_REQUIRED_VERSION} from local tarball ${archive_path}"
-  top_dir="$(tar -tf "${archive_path}" | head -n 1 | cut -d/ -f1 || true)"
-  tar -xf "${archive_path}" -C "${tmp_dir}"
+  if [[ -f "${archive_path}" ]]; then
+    archive_source="${archive_path}"
+    log "Installing Zig ${ZIG_REQUIRED_VERSION} from local tarball ${archive_source}"
+  else
+    require_cmd curl
+    warn "Local Zig tarball not found at ${archive_path}; downloading fallback from ${url}"
+    download_tmp="${tmp_dir}/$(zig_archive_name)"
+    if ! curl -fsSL "${url}" -o "${download_tmp}"; then
+      die "Failed to download Zig from ${url}"
+    fi
+    archive_source="${download_tmp}"
+
+    if mkdir -p "$(dirname -- "${local_cache_path}")" && cp -f "${archive_source}" "${local_cache_path}"; then
+      log "Cached downloaded Zig tarball at ${local_cache_path}"
+    else
+      warn "Unable to cache downloaded Zig tarball at ${local_cache_path}"
+    fi
+  fi
+
+  top_dir="$(tar -tf "${archive_source}" | head -n 1 | cut -d/ -f1 || true)"
+  tar -xf "${archive_source}" -C "${tmp_dir}"
 
   extracted_dir="${tmp_dir}/${top_dir}"
   if [[ ! -x "${extracted_dir}/zig" ]]; then
     extracted_dir="$(find "${tmp_dir}" -mindepth 1 -maxdepth 1 -type d -name "zig-*${ZIG_REQUIRED_VERSION}*" | head -n 1 || true)"
   fi
-  [[ -n "${extracted_dir}" && -x "${extracted_dir}/zig" ]] || die "Local Zig archive ${archive_path} is missing expected zig binary"
+  [[ -n "${extracted_dir}" && -x "${extracted_dir}/zig" ]] || die "Zig archive ${archive_source} is missing expected zig binary"
 
   run_privileged mkdir -p "${ZIG_INSTALL_ROOT}"
   run_privileged rm -rf "${ZIG_TOOLCHAIN_DIR}"
@@ -305,10 +321,16 @@ deploy_local_files() {
   run_privileged install -Dm755 "${LOCAL_OXWM_DIR}/oxwm-session" /usr/local/bin/oxwm-session
   run_privileged install -Dm755 "${LOCAL_OXWM_DIR}/oxwm-parser" /usr/local/bin/oxwm-parser
   run_privileged install -Dm644 "${LOCAL_OXWM_DIR}/oxwm.desktop" "${OXWM_DESKTOP_DIR}/oxwm.desktop"
+  if [[ "${OXWM_APPLICATIONS_DIR}" != "${OXWM_DESKTOP_DIR}" ]]; then
+    run_privileged install -Dm644 "${LOCAL_OXWM_DIR}/oxwm.desktop" "${OXWM_APPLICATIONS_DIR}/oxwm.desktop"
+  fi
 
   log "Installed config files to ${OXWM_CONFIG_DIR}"
   log "Installed helper scripts to /usr/local/bin"
-  log "Installed desktop file to ${OXWM_DESKTOP_DIR}/oxwm.desktop"
+  log "Installed session desktop file to ${OXWM_DESKTOP_DIR}/oxwm.desktop"
+  if [[ "${OXWM_APPLICATIONS_DIR}" != "${OXWM_DESKTOP_DIR}" ]]; then
+    log "Installed application desktop file to ${OXWM_APPLICATIONS_DIR}/oxwm.desktop"
+  fi
 }
 
 main() {
