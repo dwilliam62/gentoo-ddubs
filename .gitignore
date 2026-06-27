@@ -1,5 +1,6 @@
 collected/
 *.tar.gz
+oxwm/zig-*.tar.xz
 
 # Sync logs and temporary files
 .sync-logs/
