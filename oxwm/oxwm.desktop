@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=OXWM
+Comment=OXWM X11 Tiling Window Manager
+Exec=oxwm-session
+Type=XSession

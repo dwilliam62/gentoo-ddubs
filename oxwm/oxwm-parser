@@ -1,0 +1,362 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Standalone OxWM keybind parser (no Nix dependencies)
+#
+# Environment knobs (tunable at runtime):
+# - OXWM_CONFIG_PATH: override OxWM config.lua path (default: $HOME/.config/oxwm/config.lua)
+# - OXWM_ROFI_WIDTH_PCT: percent width for the rofi window (default: 45)
+# - OXWM_ROFI_LINES: number of visible rows in the rofi list (default: 15)
+# - OXWM_ROFI_THEME: rofi theme path; if set uses -theme; otherwise a default -config is used if present
+# - OXWM_ROFI_FONT: monospaced font passed via rofi -font for alignment (default: "monospace 11")
+# - OXWM_COL_GAP_PX: pixel gap between keybind column and description (default: 10)
+# - OXWM_CHAR_PX: approximate character width in pixels for px->spaces conversion (default: 7)
+# - OXWM_EXTRA_SPACES: extra literal spaces appended after the calculated gap (default: 5)
+# - OXWM_LUA_BIN: lua executable (default: lua)
+# - OXWM_AWK_BIN: awk executable (default: awk)
+# - OXWM_ROFI_BIN: rofi executable (default: rofi)
+#
+# Examples:
+#   OXWM_ROFI_FONT="JetBrainsMono Nerd Font 11" OXWM_ROFI_WIDTH_PCT=55 OXWM_ROFI_LINES=18 oxwm-parser
+#   OXWM_COL_GAP_PX=16 OXWM_EXTRA_SPACES=2 oxwm-parser
+#   oxwm-parser --print   # aligned output in terminal
+#   oxwm-parser           # rofi menu with alignment
+
+LUA_CFG="${OXWM_CONFIG_PATH:-$HOME/.config/oxwm/config.lua}"
+if [[ ! -f "$LUA_CFG" ]]; then
+  echo "Error: No OxWM Lua config found at $LUA_CFG" >&2
+  exit 1
+fi
+
+LUA_BIN="${OXWM_LUA_BIN:-lua}"
+AWK_BIN="${OXWM_AWK_BIN:-awk}"
+ROFI_BIN="${OXWM_ROFI_BIN:-rofi}"
+
+if ! command -v "$LUA_BIN" >/dev/null 2>&1; then
+  echo "Error: lua not found (set OXWM_LUA_BIN or install lua)" >&2
+  exit 1
+fi
+if ! command -v "$AWK_BIN" >/dev/null 2>&1; then
+  echo "Error: awk not found (set OXWM_AWK_BIN or install awk)" >&2
+  exit 1
+fi
+
+# Output format control: default shows rofi menu; --print prints to stdout
+OUT_MODE="menu"
+if [[ "${1:-}" == "--print" || "${1:-}" == "-p" ]]; then
+  OUT_MODE="print"
+  shift || true
+fi
+
+# Imperative Lua (OxWM 0.7+): execute config with a safe oxwm stub and capture binds/chords
+parse_lua_imperative() {
+  local luatmp
+  luatmp=$(mktemp)
+  cat > "$luatmp" <<'LUA'
+local entries = {}
+
+-- Helpers
+local function norm_mod(m)
+  if m == 'Mod4' then return 'Super' end
+  if m == 'Mod1' then return 'Alt' end
+  if m == 'Control' then return 'Ctrl' end
+  return m
+end
+
+local function join_mods(mods)
+  local out = {}
+  for i = 1, #(mods or {}) do out[i] = norm_mod(mods[i]) end
+  return table.concat(out, ' + ')
+end
+
+local function dir_word(n)
+  n = tonumber(n or 0) or 0
+  if n == -1 then return 'previous' end
+  if n == 1 then return 'next' end
+  if n > 1 then return '+' .. tostring(n) end
+  return tostring(n)
+end
+
+-- Action description pretty-printer
+local function desc_from_action(act)
+  if type(act) == 'table' and act.kind then
+    if act.kind == 'spawn' then
+      local cmd = act.cmd
+      if type(cmd) == 'table' then
+        local parts = {}
+        for i = 1, #cmd do parts[i] = tostring(cmd[i]) end
+        cmd = table.concat(parts, ' ')
+      else
+        cmd = tostring(cmd or "")
+      end
+      return 'Run: ' .. cmd
+    end
+    if act.kind == 'client.kill' then return 'Kill client' end
+    if act.kind == 'client.toggle_fullscreen' then return 'Toggle fullscreen' end
+    if act.kind == 'client.toggle_floating' then return 'Toggle floating' end
+    if act.kind == 'client.focus_stack' then
+      local n = tonumber(act.n or 0) or 0
+      return 'Focus ' .. (n < 0 and 'previous' or 'next') .. ' in stack'
+    end
+    if act.kind == 'client.move_stack' then
+      local n = tonumber(act.n or 0) or 0
+      return 'Move in stack: ' .. (n < 0 and 'up' or 'down')
+    end
+    if act.kind == 'toggle_gaps' or act.kind == 'oxwm.toggle_gaps' then return 'Toggle gaps' end
+    if act.kind == 'layout.set' then return 'Layout: ' .. (act.name or "") end
+    if act.kind == 'layout.cycle' then return 'Cycle layout' end
+    if act.kind == 'tag.view' then return 'Workspace: ' .. ((act.index or 0) + 1) end
+    if act.kind == 'tag.move_to' then return 'Move to workspace: ' .. ((act.index or 0) + 1) end
+    if act.kind == 'tag.toggleview' then return 'Toggle view workspace: ' .. ((act.index or 0) + 1) end
+    if act.kind == 'tag.toggletag' then return 'Toggle on workspace: ' .. ((act.index or 0) + 1) end
+    if act.kind == 'monitor.focus' then
+      local n = tonumber(act.index or 0) or 0
+      local w = dir_word(n)
+      if w == 'previous' or w == 'next' then return 'Monitor: ' .. w end
+      return 'Monitor: ' .. w
+    end
+    if act.kind == 'monitor.tag' then
+      local n = tonumber(act.index or 0) or 0
+      local w = dir_word(n)
+      if w == 'previous' or w == 'next' then return 'Send to monitor: ' .. w end
+      return 'Send to monitor: ' .. w
+    end
+    if act.kind == 'set_master_factor' then
+      local d = tonumber(act.delta or 0) or 0
+      local sign = d >= 0 and '+' or ""
+      return 'Master area: ' .. sign .. tostring(d)
+    end
+    if act.kind == 'inc_num_master' then
+      local d = tonumber(act.delta or 0) or 0
+      local sign = d >= 0 and '+' or ""
+      return 'Master windows: ' .. sign .. tostring(d)
+    end
+    if act.kind == 'quit' then return 'Quit OxWM' end
+    if act.kind == 'restart' then return 'Restart OxWM' end
+    if act.kind == 'recompile' then return 'Recompile OxWM' end
+    if act.kind == 'show_keybinds' then return 'Show keybind overlay' end
+  end
+  return 'Action'
+end
+
+-- Minimal oxwm shim capturing actions
+local oxwm = {}
+_G.oxwm = oxwm
+package = package or {}
+package.preload = package.preload or {}
+package.loaded = package.loaded or {}
+package.preload['oxwm'] = function() return oxwm end
+package.loaded['oxwm'] = oxwm
+
+-- Config state we care about
+local terminal_cmd = nil
+
+-- Top-level actions
+function oxwm.spawn(cmd) return { kind = 'spawn', cmd = cmd } end
+function oxwm.spawn_terminal()
+  return { kind = 'spawn', cmd = terminal_cmd or 'alacritty' }
+end
+function oxwm.quit() return { kind = 'quit' } end
+function oxwm.restart() return { kind = 'restart' } end
+function oxwm.recompile() return { kind = 'recompile' } end
+function oxwm.toggle_gaps() return { kind = 'toggle_gaps' } end
+function oxwm.show_keybinds() return { kind = 'show_keybinds' } end
+function oxwm.set_master_factor(delta) return { kind = 'set_master_factor', delta = delta } end
+function oxwm.inc_num_master(delta) return { kind = 'inc_num_master', delta = delta } end
+
+-- Namespaces
+oxwm.client = {}
+function oxwm.client.kill() return { kind = 'client.kill' } end
+function oxwm.client.toggle_fullscreen() return { kind = 'client.toggle_fullscreen' } end
+function oxwm.client.toggle_floating() return { kind = 'client.toggle_floating' } end
+function oxwm.client.focus_stack(n) return { kind = 'client.focus_stack', n = n } end
+function oxwm.client.move_stack(n) return { kind = 'client.move_stack', n = n } end
+
+oxwm.layout = {}
+function oxwm.layout.cycle() return { kind = 'layout.cycle' } end
+function oxwm.layout.set(name) return { kind = 'layout.set', name = name } end
+
+oxwm.tag = {}
+function oxwm.tag.view(index) return { kind = 'tag.view', index = index } end
+function oxwm.tag.move_to(index) return { kind = 'tag.move_to', index = index } end
+function oxwm.tag.toggleview(index) return { kind = 'tag.toggleview', index = index } end
+function oxwm.tag.toggletag(index) return { kind = 'tag.toggletag', index = index } end
+
+oxwm.monitor = {}
+function oxwm.monitor.focus(index) return { kind = 'monitor.focus', index = index } end
+function oxwm.monitor.tag(index) return { kind = 'monitor.tag', index = index } end
+
+-- Minimal implementations for nested namespaces used by config.lua
+oxwm.bar = {}
+function oxwm.bar.set_font(_) end
+function oxwm.bar.set_blocks(_) end
+function oxwm.bar.set_scheme_normal(_, _, _) end
+function oxwm.bar.set_scheme_occupied(_, _, _) end
+function oxwm.bar.set_scheme_selected(_, _, _) end
+function oxwm.bar.set_scheme_urgent(_, _, _) end
+function oxwm.bar.set_hide_vacant_tags(_) end
+function oxwm.bar.set_position(_) end
+oxwm.bar.block = setmetatable({}, {
+  __index = function(_, k)
+    return function(_) return { kind = 'bar.block.' .. tostring(k) } end
+  end
+})
+
+oxwm.gaps = {}
+function oxwm.gaps.set_smart(_) end
+function oxwm.gaps.set_inner(_, _) end
+function oxwm.gaps.set_outer(_, _) end
+
+oxwm.border = {}
+function oxwm.border.set_width(_) end
+function oxwm.border.set_focused_color(_) end
+function oxwm.border.set_unfocused_color(_) end
+
+oxwm.rule = {}
+function oxwm.rule.add(_) end
+
+function oxwm.set_terminal(cmd) terminal_cmd = cmd end
+function oxwm.set_modkey(_) end
+function oxwm.set_tags(_) end
+function oxwm.set_layout_symbol(_, _) end
+function oxwm.autostart(_) end
+
+-- Fallback for any other unknown namespaces/functions to avoid runtime errors
+setmetatable(oxwm, {
+  __index = function(t, k)
+    local proxy = setmetatable({}, {
+      __index = function()
+        return function() return { kind = 'oxwm.' .. tostring(k) } end
+      end,
+      __call = function()
+        return { kind = 'oxwm.' .. tostring(k) }
+      end,
+    })
+    rawset(t, k, proxy)
+    return proxy
+  end
+})
+
+-- Key APIs
+oxwm.key = {}
+function oxwm.key.bind(mods, key, action)
+  local mods_str = join_mods(mods or {})
+  local kb = key or ""
+  if mods_str ~= "" and kb ~= "" then kb = mods_str .. ' + ' .. kb end
+  local descr = desc_from_action(action)
+  table.insert(entries, { kb = kb, desc = descr })
+end
+
+function oxwm.key.chord(keys, action)
+  local parts = {}
+  for i = 1, #(keys or {}) do
+    local tuple = keys[i] or {}
+    local mods = tuple[1] or {}
+    local key = tuple[2] or ""
+    local mods_str = join_mods(mods)
+    local frag = key
+    if mods_str ~= "" and key ~= "" then frag = mods_str .. ' + ' .. key end
+    table.insert(parts, frag)
+  end
+  local kb = table.concat(parts, ', ')
+  local descr = desc_from_action(action)
+  table.insert(entries, { kb = kb, desc = descr })
+end
+
+-- Load the real config
+local cfg = os.getenv('OXWM_CONFIG_PATH')
+local ok = pcall(function() dofile(cfg) end)
+
+-- Emit results
+for _, e in ipairs(entries) do
+  local kb = e.kb or ""
+  local desc = e.desc or ""
+  if kb ~= "" or desc ~= "" then
+    io.write(kb .. "\t" .. desc .. "\n")
+  end
+end
+LUA
+  OXWM_CONFIG_PATH="$LUA_CFG" "$LUA_BIN" "$luatmp" || true
+  rm -f "$luatmp"
+}
+
+# Collect entries to a temp file to reuse for printing/menu
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
+# Parse with the imperative Lua config (OxWM 0.7+)
+parse_lua_imperative > "$tmp" || true
+
+if [[ ! -s "$tmp" ]]; then
+  echo "No keybind entries parsed from OxWM config." >&2
+  exit 2
+fi
+
+# Compute spacer between keybind and description (approximate px->spaces)
+CHAR_PX="${OXWM_CHAR_PX:-7}"
+GAP_PX="${OXWM_COL_GAP_PX:-10}"
+GAP_SPACES=$(( (GAP_PX + CHAR_PX - 1) / CHAR_PX ))
+if [ "$GAP_SPACES" -lt 1 ]; then GAP_SPACES=2; fi
+SPACER=$(printf '%*s' "$GAP_SPACES" "")
+ADD_SPACES="${OXWM_EXTRA_SPACES:-5}"
+SPACER="$SPACER$(printf '%*s' "$ADD_SPACES" "")"
+
+if [[ "$OUT_MODE" == "print" ]]; then
+  "$AWK_BIN" -v spacer="$SPACER" -F'\t' '
+    { kb[NR]=$1; desc[NR]=$2; if (length($1) > max) max=length($1) }
+    END {
+      for (i=1; i<=NR; i++) printf "%-*s%s%s\n", max, kb[i], spacer, desc[i]
+    }
+  ' "$tmp"
+else
+  if ! command -v "$ROFI_BIN" >/dev/null 2>&1; then
+    echo "Error: rofi not found (set OXWM_ROFI_BIN or install rofi), or use --print" >&2
+    exit 1
+  fi
+
+  # Script-level defaults (overridable at runtime via env):
+  # Defaults:
+  #   - DEFAULT_WIDTH_PCT: percent of screen width for the rofi window (e.g., "45")
+  #   - DEFAULT_LINES: number of visible rows in the list (e.g., "15")
+  #   - DEFAULT_ROFI_THEME: path to a rofi theme/config file for colors (set empty to disable)
+  #
+  # Runtime overrides (env vars):
+  #   - OXWM_ROFI_WIDTH_PCT: percent width override (e.g., OXWM_ROFI_WIDTH_PCT=60)
+  #   - OXWM_ROFI_LINES: number of rows override (e.g., OXWM_ROFI_LINES=25)
+  #   - OXWM_ROFI_THEME: theme file override (e.g., OXWM_ROFI_THEME=$HOME/.config/rofi/legacy.config.rasi)
+  #
+  # Examples:
+  #   OXWM_ROFI_WIDTH_PCT=55 OXWM_ROFI_LINES=18 oxwm-parser
+  #   OXWM_ROFI_THEME=$HOME/.config/rofi/legacy.config.rasi oxwm-parser
+  DEFAULT_WIDTH_PCT="45"   # percent of screen width
+  DEFAULT_LINES="15"       # number of visible rows
+  DEFAULT_ROFI_THEME="$HOME/.config/rofi/legacy.config.rasi"  # set to empty to disable
+  DEFAULT_ROFI_FONT="monospace 11"  # enforce monospaced font for alignment
+
+  # Resolve effective settings with env overrides
+  WIDTH_PCT="${OXWM_ROFI_WIDTH_PCT:-$DEFAULT_WIDTH_PCT}"
+  LINES="${OXWM_ROFI_LINES:-$DEFAULT_LINES}"
+  FONT="${OXWM_ROFI_FONT:-$DEFAULT_ROFI_FONT}"
+
+  # Theme/config: prefer explicit env theme, then script default theme if it exists
+  if [[ -n "${OXWM_ROFI_THEME:-}" ]]; then
+    THEME_OPT=(-theme "${OXWM_ROFI_THEME}")
+  elif [[ -n "$DEFAULT_ROFI_THEME" && -f "$DEFAULT_ROFI_THEME" ]]; then
+    THEME_OPT=(-config "$DEFAULT_ROFI_THEME")
+  else
+    THEME_OPT=()
+  fi
+
+  # Pass font via CLI (avoids theme parser issues)
+  FONT_OPT=(-font "$FONT")
+
+  # Force width/lines/columns via theme-str for alignment
+  # Limit height to ~40px per line + padding to prevent vertical fill
+  MAX_HEIGHT=$(( LINES * 40 + 60 ))
+  THEME_STR="window { width: ${WIDTH_PCT}%; height: ${MAX_HEIGHT}px; } listview { lines: ${LINES}; columns: 1; }"
+
+  "$AWK_BIN" -v spacer="$SPACER" -F"\t" '
+    { kb[NR]=$1; desc[NR]=$2; if (length($1) > max) max=length($1) }
+    END { for (i=1; i<=NR; i++) printf "%-*s%s%s\n", max, kb[i], spacer, desc[i] }
+  ' "$tmp" | "$ROFI_BIN" -dmenu -i -p "OxWM Keys" -no-custom "${THEME_OPT[@]}" "${FONT_OPT[@]}" -theme-str "$THEME_STR" -kb-custom-1 "" 2>/dev/null || true
+fi
