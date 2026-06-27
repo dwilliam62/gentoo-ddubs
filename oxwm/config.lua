@@ -122,10 +122,18 @@ oxwm.set_layout("dwindle")
 -------------------------------------------------------------------------------
 -- Set custom symbols for layouts (displayed in the status bar)
 -- Available layouts: "tiling", "normie" (floating), "grid", "monocle", "tabbed", "dwindle"
-oxwm.set_layout_symbol("tiling", "[T]")
-oxwm.set_layout_symbol("normie", "[F]")
-oxwm.set_layout_symbol("tabbed", "[=]")
-oxwm.set_layout_symbol("dwindle", "[\\]")
+-- oxwm.set_layout_symbol("tiling", "[T]")
+-- oxwm.set_layout_symbol("normie", "[F]")
+-- oxwm.set_layout_symbol("tabbed", "[=]")
+-- oxwm.set_layout_symbol("dwindle", "[\\]")
+
+oxwm.set_layout_symbol("tiling", " [[T]]")
+oxwm.set_layout_symbol("monocle", " [[M]]")
+oxwm.set_layout_symbol("normie", " [[N]]") -- normie == floating layout
+oxwm.set_layout_symbol("grid", " [[G]]")
+oxwm.set_layout_symbol("dwindle", " [[D]]")
+oxwm.set_layout_symbol("scrolling", " [[S]]") -- horizontal-scroll (swap if you prefer another glyph)
+
 
 -- Example: bind dwindle (fibonacci) layout
 oxwm.key.bind({ modkey, "alt" }, "R", oxwm.layout.set("dwindle"))
@@ -135,7 +143,7 @@ oxwm.key.bind({ modkey, "alt" }, "R", oxwm.layout.set("dwindle"))
 oxwm.set_tag_layout(1, "dwindle")
 oxwm.set_tag_layout(2, "dwindle")
 oxwm.set_tag_layout(3, "tiling")
-oxwm.set_tag_layout(4, "normie")
+oxwm.set_tag_layout(4, "scrolling")
 
 -------------------------------------------------------------------------------
 -- Appearance
@@ -232,8 +240,12 @@ oxwm.key.bind({ modkey }, "V", oxwm.spawn("pavucontrol"))
 oxwm.key.bind({ modkey, "Shift" }, "N", oxwm.spawn("variety --next"))
 oxwm.key.bind({ modkey, "Shift" }, "P", oxwm.spawn("variety --previous"))
 
+-- oxwm-parser keybinds search rofi menu
+oxwm.key.bind({ modkey, "Shift" }, "K", oxwm.spawn("oxwm-parser"))
+
 -- Ghostty terminal on Super+Shift+Return
 oxwm.key.bind({ modkey, "Shift" }, "Return", oxwm.spawn("ghostty"))
+
 -- Launcher
 oxwm.key.bind({ modkey }, "D", oxwm.spawn({ "sh", "-c", "rofi -show drun" }))
 oxwm.key.bind({ modkey, "Shift" }, "D", oxwm.spawn({ "sh", "-c", "rofi -show drun" }))
@@ -253,13 +265,50 @@ oxwm.key.bind({ modkey, "Shift" }, "F", oxwm.client.toggle_fullscreen())
 oxwm.key.bind({ modkey, "Shift" }, "Space", oxwm.client.toggle_floating())
 
 -- Layout management
-oxwm.key.bind({ modkey }, "F", oxwm.layout.set("normie"))
-oxwm.key.bind({ modkey }, "C", oxwm.layout.set("tiling"))
+-- Mod+Alt+R: reset/return the current tag to the defined default layout.
+oxwm.key.bind({ modkey, "Mod1" }, "R", oxwm.layout.set(default_layout))
+oxwm.key.bind({ "Shift", "Control" }, "1", oxwm.layout.set("dwindle")) -- default
+oxwm.key.bind({ "Shift", "Control" }, "2", oxwm.layout.set("tiling"))
+oxwm.key.bind({ "Shift", "Control" }, "3", oxwm.layout.set("scrolling"))
+oxwm.key.bind({ "Shift", "Control" }, "4", oxwm.layout.set("grid"))
+oxwm.key.bind({ "Shift", "Control" }, "5", oxwm.layout.set("monocle"))
+oxwm.key.bind({ "Shift", "Control" }, "6", oxwm.layout.set("normie")) -- floating
+
+-- Pan the scrolling layout (no-op in other layouts)
+oxwm.key.bind({ modkey }, "bracketleft", oxwm.layout.scroll_left())
+oxwm.key.bind({ modkey }, "bracketright", oxwm.layout.scroll_right())
+
+-- Multi-monitor (focus on Ctrl+Shift+arrows; send window stays on Mod+Shift+,/.)
+oxwm.key.bind({ "Control", "Shift" }, "Left", oxwm.monitor.focus(-1))
+oxwm.key.bind({ "Control", "Shift" }, "Right", oxwm.monitor.focus(1))
+oxwm.key.bind({ modkey, "Shift" }, "Comma", oxwm.monitor.tag(-1))
+oxwm.key.bind({ modkey, "Shift" }, "Period", oxwm.monitor.tag(1))
+
+-- Tag navigation
+oxwm.key.bind({ modkey }, "Tab", oxwm.tag.view_next())
+oxwm.key.bind({ modkey, "Shift" }, "Tab", oxwm.tag.view_previous())
+oxwm.key.bind({ modkey, "Control" }, "Tab", oxwm.tag.view_next_nonempty())
+-- Adjacent-tag view on Mod+,/. (comma/period = previous/next workspace)
+oxwm.key.bind({ modkey }, "Comma", oxwm.tag.view_previous())
+oxwm.key.bind({ modkey }, "Period", oxwm.tag.view_next())
+
 -- Cycle through layouts
 oxwm.key.bind({ modkey }, "N", oxwm.layout.cycle())
 
--- Master area controls (tiling layout)
+-- Focus / move within stack (arrows = dwm-faithful, hjkl = ergonomic)
+oxwm.key.bind({ modkey }, "Left", oxwm.client.focus_stack(-1))
+oxwm.key.bind({ modkey }, "Right", oxwm.client.focus_stack(1))
+oxwm.key.bind({ modkey }, "K", oxwm.client.focus_stack(-1))
+oxwm.key.bind({ modkey }, "J", oxwm.client.focus_stack(1))
+oxwm.key.bind({ modkey, "Shift" }, "Left", oxwm.client.move_stack(-1))
+oxwm.key.bind({ modkey, "Shift" }, "Right", oxwm.client.move_stack(1))
+oxwm.key.bind({ modkey, "Shift" }, "K", oxwm.client.move_stack(-1))
+oxwm.key.bind({ modkey, "Shift" }, "J", oxwm.client.move_stack(1))
 
+
+-- Master area controls (tiling layout)
+oxwm.key.bind({ modkey, "Control" }, "Left", oxwm.set_master_factor(-5))
+oxwm.key.bind({ modkey, "Control" }, "Right", oxwm.set_master_factor(5))
 -- Decrease/Increase master area width
 oxwm.key.bind({ modkey }, "H", oxwm.set_master_factor(-5))
 oxwm.key.bind({ modkey }, "L", oxwm.set_master_factor(5))
