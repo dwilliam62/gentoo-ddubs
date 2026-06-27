@@ -57,10 +57,13 @@ local entries = {}
 
 -- Helpers
 local function norm_mod(m)
-  if m == 'Mod4' then return 'Super' end
-  if m == 'Mod1' then return 'Alt' end
-  if m == 'Control' then return 'Ctrl' end
-  return m
+  local value = tostring(m or '')
+  local lower = string.lower(value)
+  if lower == 'mod4' or lower == 'super' then return 'Super' end
+  if lower == 'mod1' or lower == 'alt' then return 'Alt' end
+  if lower == 'control' or lower == 'ctrl' then return 'Ctrl' end
+  if lower == 'shift' then return 'Shift' end
+  return value
 end
 
 local function join_mods(mods)
@@ -103,6 +106,7 @@ local function desc_from_action(act)
       return 'Move in stack: ' .. (n < 0 and 'up' or 'down')
     end
     if act.kind == 'toggle_gaps' or act.kind == 'oxwm.toggle_gaps' then return 'Toggle gaps' end
+    if act.kind == 'toggle_bar' or act.kind == 'oxwm.toggle_bar' then return 'Toggle bar' end
     if act.kind == 'layout.set' then return 'Layout: ' .. (act.name or "") end
     if act.kind == 'layout.cycle' then return 'Cycle layout' end
     if act.kind == 'tag.view' then return 'Workspace: ' .. ((act.index or 0) + 1) end
@@ -160,6 +164,7 @@ function oxwm.quit() return { kind = 'quit' } end
 function oxwm.restart() return { kind = 'restart' } end
 function oxwm.recompile() return { kind = 'recompile' } end
 function oxwm.toggle_gaps() return { kind = 'toggle_gaps' } end
+function oxwm.toggle_bar() return { kind = 'toggle_bar' } end
 function oxwm.show_keybinds() return { kind = 'show_keybinds' } end
 function oxwm.set_master_factor(delta) return { kind = 'set_master_factor', delta = delta } end
 function oxwm.inc_num_master(delta) return { kind = 'inc_num_master', delta = delta } end
@@ -218,7 +223,10 @@ function oxwm.rule.add(_) end
 function oxwm.set_terminal(cmd) terminal_cmd = cmd end
 function oxwm.set_modkey(_) end
 function oxwm.set_tags(_) end
+function oxwm.set_layout(_) end
 function oxwm.set_layout_symbol(_, _) end
+function oxwm.set_tag_layout(_, _) end
+function oxwm.set_floating_position(_) end
 function oxwm.autostart(_) end
 
 -- Fallback for any other unknown namespaces/functions to avoid runtime errors
@@ -265,7 +273,10 @@ end
 
 -- Load the real config
 local cfg = os.getenv('OXWM_CONFIG_PATH')
-local ok = pcall(function() dofile(cfg) end)
+local ok, err = pcall(function() dofile(cfg) end)
+if not ok then
+  io.stderr:write('Failed to parse config.lua: ' .. tostring(err) .. '\n')
+end
 
 -- Emit results
 for _, e in ipairs(entries) do
