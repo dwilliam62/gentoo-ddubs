@@ -312,12 +312,23 @@ build_oxwm() {
 deploy_local_files() {
   [[ -f "${LOCAL_OXWM_DIR}/config.lua" ]] || die "Missing ${LOCAL_OXWM_DIR}/config.lua"
   [[ -f "${LOCAL_OXWM_DIR}/oxwm.lua" ]] || die "Missing ${LOCAL_OXWM_DIR}/oxwm.lua"
+  [[ -f "${LOCAL_OXWM_DIR}/picom.conf" ]] || die "Missing ${LOCAL_OXWM_DIR}/picom.conf"
+  [[ -f "${LOCAL_OXWM_DIR}/wallpaper.jpg" ]] || die "Missing ${LOCAL_OXWM_DIR}/wallpaper.jpg"
   [[ -f "${LOCAL_OXWM_DIR}/oxwm-session" ]] || die "Missing ${LOCAL_OXWM_DIR}/oxwm-session"
   [[ -f "${LOCAL_OXWM_DIR}/oxwm-parser" ]] || die "Missing ${LOCAL_OXWM_DIR}/oxwm-parser"
   [[ -f "${LOCAL_OXWM_DIR}/oxwm.desktop" ]] || die "Missing ${LOCAL_OXWM_DIR}/oxwm.desktop"
+  local legacy_picom backup_picom
+  legacy_picom="${TARGET_HOME}/.config/picom.conf"
+  if run_as_target_user test -f "${legacy_picom}"; then
+    backup_picom="${legacy_picom}.bak.$(date +%Y%m%d-%H%M%S)"
+    run_as_target_user cp -a "${legacy_picom}" "${backup_picom}"
+    log "Backed up legacy picom config ${legacy_picom} -> ${backup_picom}"
+  fi
 
   run_as_target_user install -Dm644 "${LOCAL_OXWM_DIR}/config.lua" "${OXWM_CONFIG_DIR}/config.lua"
   run_as_target_user install -Dm644 "${LOCAL_OXWM_DIR}/oxwm.lua" "${OXWM_CONFIG_DIR}/oxwm.lua"
+  run_as_target_user install -Dm644 "${LOCAL_OXWM_DIR}/picom.conf" "${TARGET_HOME}/.config/picom/picom.conf"
+  run_as_target_user install -Dm644 "${LOCAL_OXWM_DIR}/wallpaper.jpg" "${TARGET_HOME}/wallpaper.jpg"
   run_privileged install -Dm755 "${LOCAL_OXWM_DIR}/oxwm-session" /usr/local/bin/oxwm-session
   run_privileged install -Dm755 "${LOCAL_OXWM_DIR}/oxwm-parser" /usr/local/bin/oxwm-parser
   run_privileged install -Dm644 "${LOCAL_OXWM_DIR}/oxwm.desktop" "${OXWM_DESKTOP_DIR}/oxwm.desktop"
@@ -326,6 +337,8 @@ deploy_local_files() {
   fi
 
   log "Installed config files to ${OXWM_CONFIG_DIR}"
+  log "Installed picom config to ${TARGET_HOME}/.config/picom/picom.conf"
+  log "Installed wallpaper to ${TARGET_HOME}/wallpaper.jpg"
   log "Installed helper scripts to /usr/local/bin"
   log "Installed session desktop file to ${OXWM_DESKTOP_DIR}/oxwm.desktop"
   if [[ "${OXWM_APPLICATIONS_DIR}" != "${OXWM_DESKTOP_DIR}" ]]; then

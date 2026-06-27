@@ -788,6 +788,8 @@ HYPR_PACKAGES=(
   net-wireless/bluez-tools
   net-misc/networkmanager
   sys-apps/bat
+  sys-apps/ripgrep
+  sys-apps/ugrep
   sys-kernel/installkernel
   sys-fs/ncdu
   sys-apps/eza
