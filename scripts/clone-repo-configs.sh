@@ -307,6 +307,45 @@ any_login_manager_detected() {
 
   return 1
 }
+ensure_required_repositories() {
+  local repo
+  local required_repos=(guru hyproverlay)
+  local localrepo_dir="/var/db/repos/localrepo"
+  local localrepo_name_file="${localrepo_dir}/profiles/repo_name"
+  local localrepo_conf_file="/etc/portage/repos.conf/localrepo.conf"
+
+  if [[ "$DRY_RUN" = "true" ]]; then
+    say "Would ensure required overlays and localrepo skeleton exist."
+    return 0
+  fi
+
+  run_cmd mkdir -p "${localrepo_dir}/profiles"
+  if [[ ! -f "$localrepo_name_file" ]]; then
+    printf '%s\n' localrepo >"$localrepo_name_file"
+  fi
+  if [[ ! -f "$localrepo_conf_file" ]]; then
+    run_cmd mkdir -p /etc/portage/repos.conf
+    cat >"$localrepo_conf_file" <<'EOF'
+[localrepo]
+location = /var/db/repos/localrepo
+masters = gentoo
+auto-sync = no
+EOF
+  fi
+
+  if command -v emaint >/dev/null 2>&1; then
+    for repo in "${required_repos[@]}"; do
+      if grep -Rqs "^\[$repo\]" /etc/portage/repos.conf; then
+        say "Syncing repository ${repo}..."
+        run_cmd emaint sync -r "$repo"
+      else
+        say "WARN: Repository ${repo} not configured in /etc/portage/repos.conf; skipping sync."
+      fi
+    done
+  else
+    say "WARN: emaint not available; skipping overlay sync."
+  fi
+}
 
 ensure_ly_if_no_login_manager() {
   if login_manager_atom_installed "x11-misc/ly"; then
@@ -447,6 +486,7 @@ main() {
   set_makeconf_video_cards "/etc/portage/make.conf" "$cards"
   set_gpu_specific_mesa_flags "$cards"
   say "GPU-aware config applied with VIDEO_CARDS=${cards}"
+  ensure_required_repositories
 
   ensure_ly_if_no_login_manager
 
