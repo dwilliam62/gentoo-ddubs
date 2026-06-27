@@ -2,8 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## Jun 2026  
+## Jun 2026
 
+<<<<<<< HEAD
 - Updated: 
   - `gentoo-install-hyprland` script 
   - `yazi` build script to install current yazi bld 
@@ -22,15 +23,42 @@ All notable changes to this project will be documented in this file.
    - python target fix to `make.conf`
    - `PYTHON_TARGETS="python3_13 python3_14"`
    - `PYTHON_SINGLE_TARGET="python3_14"`
+||||||| parent of fa38ee9d (Added tui-installer from GH oddlama/gentoo-install)
+- Added python overrides for: 
+   - `nwg-display`
+   - `variety` 
+   - `docutils`
+   - `pycairo`
+   - `pygobject`
+   - `waypaper`
+- Added python target fix to `make.conf`
+   - `PYTHON_TARGETS="python3_13 python3_14"`
+   - `PYTHON_SINGLE_TARGET="python3_14"`
+=======
+- Added gentoo installer
+  - From `https://github.com/oddlama/gentoo-install`
+  - I had to patch it to get it to install
+  - The patched version is now included
+- Added python overrides for:
+  - `nwg-display`
+  - `variety`
+  - `docutils`
+  - `pycairo`
+  - `pygobject`
+  - `waypaper`
+- Added python target fix to `make.conf`
+  - `PYTHON_TARGETS="python3_13 python3_14"`
+  - `PYTHON_SINGLE_TARGET="python3_14"`
+>>>>>>> fa38ee9d (Added tui-installer from GH oddlama/gentoo-install)
 
-## May 2026  
+## May 2026
 
-- Updated: `scripts/update.sh` Now calls kernel cleanup script 
-- Added `scripts/update-yazi.sh` 
-  - Checks existing version and updates to current build 
+- Updated: `scripts/update.sh` Now calls kernel cleanup script
+- Added `scripts/update-yazi.sh`
+  - Checks existing version and updates to current build
 - Updated `zig` compiler to v0.16.0 `oxwm` now compatible
-- Reworked `/boot/efi` mount options 
-  - To prevent boot failure `can't mount /boot/efi` 
+- Reworked `/boot/efi` mount options
+  - To prevent boot failure `can't mount /boot/efi`
 
 ## Apr 2026
 
@@ -43,7 +71,7 @@ All notable changes to this project will be documented in this file.
 - Removed source-build helper for `hyprland-qtutils` now that it is available via Portage/overlay.
 - Added `gui-libs/hyprland-qtutils` to the Hyprland package list in `gentoo-install-hyprland.sh`.
 
-## Jan 2026 
+## Jan 2026
 
 - Added: `OxWM` Window Manager from `@tony,btw`
 - GitHub repo [here](https://github.com/tonybanters/oxwm)
