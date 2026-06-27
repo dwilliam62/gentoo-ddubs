@@ -216,10 +216,10 @@ login_manager_atom_installed() {
 
 ensure_ly_package_use_for_init() {
   local ly_use_file="/etc/portage/package.use/ly-login-manager"
-  local ly_flags="x11-misc/ly X"
+  local ly_flags="x11-misc/ly -X"
 
   if command -v systemctl >/dev/null 2>&1; then
-    ly_flags="x11-misc/ly X systemd"
+    ly_flags="x11-misc/ly -X systemd"
   fi
 
   if [[ "$DRY_RUN" = "true" ]]; then
@@ -312,6 +312,7 @@ ensure_required_repositories() {
   local required_repos=(guru hyproverlay)
   local localrepo_dir="/var/db/repos/localrepo"
   local localrepo_name_file="${localrepo_dir}/profiles/repo_name"
+  local localrepo_layout_file="${localrepo_dir}/metadata/layout.conf"
   local localrepo_conf_file="/etc/portage/repos.conf/localrepo.conf"
 
   if [[ "$DRY_RUN" = "true" ]]; then
@@ -319,9 +320,14 @@ ensure_required_repositories() {
     return 0
   fi
 
-  run_cmd mkdir -p "${localrepo_dir}/profiles"
+  run_cmd mkdir -p "${localrepo_dir}/profiles" "${localrepo_dir}/metadata"
   if [[ ! -f "$localrepo_name_file" ]]; then
     printf '%s\n' localrepo >"$localrepo_name_file"
+  fi
+  if [[ ! -f "$localrepo_layout_file" ]]; then
+    cat >"$localrepo_layout_file" <<'EOF'
+masters = gentoo
+EOF
   fi
   if [[ ! -f "$localrepo_conf_file" ]]; then
     run_cmd mkdir -p /etc/portage/repos.conf
@@ -335,9 +341,23 @@ EOF
 
   if command -v emaint >/dev/null 2>&1; then
     for repo in "${required_repos[@]}"; do
+      local repo_dir="/var/db/repos/${repo}"
       if grep -Rqs "^\[$repo\]" /etc/portage/repos.conf; then
+        if [[ -d "$repo_dir" && ! -d "${repo_dir}/.git" ]]; then
+          if find "$repo_dir" -mindepth 1 -maxdepth 1 ! \( -name profiles -o -name metadata \) | grep -q .; then
+            say "WARN: ${repo_dir} is non-git and contains unexpected files; leaving as-is before sync."
+          else
+            run_cmd rm -rf "$repo_dir"
+          fi
+        fi
         say "Syncing repository ${repo}..."
-        run_cmd emaint sync -r "$repo"
+        if [[ "$DRY_RUN" = "true" ]]; then
+          run_cmd emaint sync -r "$repo"
+        else
+          if ! emaint sync -r "$repo"; then
+            say "WARN: Failed to sync ${repo}; continuing."
+          fi
+        fi
       else
         say "WARN: Repository ${repo} not configured in /etc/portage/repos.conf; skipping sync."
       fi
@@ -361,6 +381,7 @@ ensure_ly_if_no_login_manager() {
 }
 
 ensure_ly_installed_and_enabled() {
+  ensure_required_repositories
   ensure_ly_package_use_for_init
   if login_manager_atom_installed "x11-misc/ly"; then
     say "ly package already installed; ensuring service configuration."
