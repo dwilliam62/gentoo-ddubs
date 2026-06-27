@@ -49,7 +49,7 @@ Options:
 
 Environment overrides:
   OXWM_REPO_URL, OXWM_SOURCE_DIR, OXWM_CONFIG_DIR, OXWM_DESKTOP_DIR
-  ZIG_REQUIRED_VERSION, ZIG_INSTALL_ROOT, ZIG_COMPAT_SYMLINK
+  ZIG_REQUIRED_VERSION, ZIG_INSTALL_ROOT, ZIG_COMPAT_SYMLINK, ZIG_LOCAL_TARBALL
 EOF
 }
 
@@ -196,20 +196,35 @@ zig_download_triplet() {
 
   printf '%s-%s\n' "${os}" "${arch}"
 }
+zig_local_archive_path() {
+  local os arch
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m)"
+
+  case "${arch}" in
+    x86_64|amd64) arch="x86_64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    riscv64) arch="riscv64" ;;
+  esac
+
+  printf '%s/zig-%s-%s-%s.tar.xz\n' "${LOCAL_OXWM_DIR}" "${arch}" "${os}" "${ZIG_REQUIRED_VERSION}"
+}
 
 install_zig_toolchain() {
-  local triplet archive_name url tmp_dir extracted_dir
-  triplet="$(zig_download_triplet)"
-  archive_name="zig-${triplet}-${ZIG_REQUIRED_VERSION}.tar.xz"
-  url="https://ziglang.org/download/${ZIG_REQUIRED_VERSION}/${archive_name}"
+  local archive_path tmp_dir extracted_dir top_dir
+  archive_path="${ZIG_LOCAL_TARBALL:-$(zig_local_archive_path)}"
+  [[ -f "${archive_path}" ]] || die "Local Zig tarball not found at ${archive_path}; place it in ${LOCAL_OXWM_DIR} or set ZIG_LOCAL_TARBALL"
   tmp_dir="$(mktemp -d)"
 
-  log "Installing Zig ${ZIG_REQUIRED_VERSION} from ${url}"
-  curl -fsSL "${url}" -o "${tmp_dir}/${archive_name}"
-  tar -xf "${tmp_dir}/${archive_name}" -C "${tmp_dir}"
+  log "Installing Zig ${ZIG_REQUIRED_VERSION} from local tarball ${archive_path}"
+  top_dir="$(tar -tf "${archive_path}" | head -n 1 | cut -d/ -f1 || true)"
+  tar -xf "${archive_path}" -C "${tmp_dir}"
 
-  extracted_dir="${tmp_dir}/zig-${triplet}-${ZIG_REQUIRED_VERSION}"
-  [[ -x "${extracted_dir}/zig" ]] || die "Downloaded Zig archive missing zig binary"
+  extracted_dir="${tmp_dir}/${top_dir}"
+  if [[ ! -x "${extracted_dir}/zig" ]]; then
+    extracted_dir="$(find "${tmp_dir}" -mindepth 1 -maxdepth 1 -type d -name "zig-*${ZIG_REQUIRED_VERSION}*" | head -n 1 || true)"
+  fi
+  [[ -n "${extracted_dir}" && -x "${extracted_dir}/zig" ]] || die "Local Zig archive ${archive_path} is missing expected zig binary"
 
   run_privileged mkdir -p "${ZIG_INSTALL_ROOT}"
   run_privileged rm -rf "${ZIG_TOOLCHAIN_DIR}"
@@ -298,7 +313,6 @@ deploy_local_files() {
 
 main() {
   require_cmd git
-  require_cmd curl
   require_cmd tar
 
   if [[ "${SKIP_DEPS}" == false ]]; then
