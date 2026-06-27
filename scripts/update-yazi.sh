@@ -28,6 +28,40 @@ version_ge() {
   [[ "$(printf '%s\n%s\n' "$required" "$actual" | sort -V | head -n 1)" == "$required" ]]
 }
 
+ensure_min_rustc_for_live() {
+  local rustc_ver desired_impl
+  desired_impl="rust-bin-${MIN_RUSTC_VERSION_LIVE}"
+  rustc_ver="$(current_rustc_version || true)"
+
+  if [[ -n "$rustc_ver" ]] && version_ge "$rustc_ver" "$MIN_RUSTC_VERSION_LIVE"; then
+    return 0
+  fi
+
+  say "rustc ${rustc_ver:-unavailable} is below required ${MIN_RUSTC_VERSION_LIVE}; installing ${desired_impl} ..."
+  if ! emerge --oneshot "=dev-lang/${desired_impl}"; then
+    say "WARN: failed to install dev-lang/${desired_impl}."
+    return 1
+  fi
+
+  if command -v eselect >/dev/null 2>&1; then
+    eselect rust set "${desired_impl}" >/dev/null 2>&1 || true
+  fi
+
+  hash -r || true
+  rustc_ver="$(current_rustc_version || true)"
+  if [[ -z "$rustc_ver" ]]; then
+    say "WARN: rustc is still unavailable after installing ${desired_impl}."
+    return 1
+  fi
+  if ! version_ge "$rustc_ver" "$MIN_RUSTC_VERSION_LIVE"; then
+    say "WARN: rustc ${rustc_ver} is still below required ${MIN_RUSTC_VERSION_LIVE}."
+    return 1
+  fi
+
+  say "Using rustc ${rustc_ver} for live yazi build."
+  return 0
+}
+
 print_usage() {
   cat <<'EOF'
 Usage:
@@ -213,20 +247,15 @@ EOF
 install_yazi() {
   local rustc_ver
   need_root "$@"
-
-  rustc_ver="$(current_rustc_version || true)"
-  if [[ -z "$rustc_ver" ]]; then
-    say "WARN: rustc not found in PATH; skipping $YAZI_ATOM build."
-    say "Install Rust >= ${MIN_RUSTC_VERSION_LIVE} and rerun to build live yazi."
-    return 0
-  fi
-  if ! version_ge "$rustc_ver" "$MIN_RUSTC_VERSION_LIVE"; then
-    say "WARN: rustc ${rustc_ver} is too old for $YAZI_ATOM (requires >= ${MIN_RUSTC_VERSION_LIVE})."
+  if ! ensure_min_rustc_for_live; then
     say "Skipping live yazi update and keeping current repository yazi package state."
     return 0
   fi
+
+  rustc_ver="$(current_rustc_version || true)"
   ensure_guru_repo
   ensure_keyword_fix
+  say "rustc ${rustc_ver} satisfies live yazi requirement (>= ${MIN_RUSTC_VERSION_LIVE})."
   say "Installing/updating $YAZI_ATOM ..."
   emerge --oneshot "$YAZI_ATOM"
   say "Install/update completed."

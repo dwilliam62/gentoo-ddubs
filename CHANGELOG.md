@@ -4,18 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## Jun 2026  
 
-- Added `clone-gentoo.sh` script 
+- Updated: 
+  - `gentoo-install-hyprland` script 
+  - `yazi` build script to install current yazi bld 
+- Added:
+   - `oxwm` install script 
+      - Removed `oxwm` install from hyprland install
+   - `clone-gentoo.sh` script 
    - installs my config on blank systems 
-   - Adds `ly` login mgr 
-   - Udpated `gentoo-install-hyprland` script 
-- Added python overrides for: 
+   - `ly` login mgr 
    - `nwg-display`
    - `variety` 
    - `docutils`
    - `pycairo`
    - `pygobject`
    - `waypaper`
-- Added python target fix to `make.conf`
+   - python target fix to `make.conf`
    - `PYTHON_TARGETS="python3_13 python3_14"`
    - `PYTHON_SINGLE_TARGET="python3_14"`
 
