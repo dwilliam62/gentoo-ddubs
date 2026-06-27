@@ -134,7 +134,6 @@ oxwm.set_layout_symbol("grid", " [[G]]")
 oxwm.set_layout_symbol("dwindle", " [[D]]")
 oxwm.set_layout_symbol("scrolling", " [[S]]") -- horizontal-scroll (swap if you prefer another glyph)
 
-
 -- Example: bind dwindle (fibonacci) layout
 oxwm.key.bind({ modkey, "alt" }, "R", oxwm.layout.set("dwindle"))
 
@@ -305,7 +304,6 @@ oxwm.key.bind({ modkey, "Shift" }, "Right", oxwm.client.move_stack(1))
 oxwm.key.bind({ modkey, "Shift" }, "K", oxwm.client.move_stack(-1))
 oxwm.key.bind({ modkey, "Shift" }, "J", oxwm.client.move_stack(1))
 
-
 -- Master area controls (tiling layout)
 oxwm.key.bind({ modkey, "Control" }, "Left", oxwm.set_master_factor(-5))
 oxwm.key.bind({ modkey, "Control" }, "Right", oxwm.set_master_factor(5))
@@ -408,7 +406,7 @@ oxwm.key.chord({
 -- Commands to run once when OXWM starts
 -- Uncomment and modify these examples, or add your own
 
--- oxwm.autostart("picom")
--- oxwm.autostart("feh --bg-scale ~/wallpaper.jpg")
--- oxwm.autostart("dunst")
+oxwm.autostart("picom")
+oxwm.autostart("feh --bg-scale ~/wallpaper.jpg")
+oxwm.autostart("dunst")
 -- oxwm.autostart("nm-applet")
