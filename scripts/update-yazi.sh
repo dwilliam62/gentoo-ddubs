@@ -6,9 +6,26 @@ KEYWORD_ENTRY="=app-misc/yazi-9999::guru **"
 KEYWORDS_PATH="/etc/portage/package.accept_keywords"
 GURU_REPO_CONF="/etc/portage/repos.conf/guru.conf"
 GURU_SYNC_URI="https://gitweb.gentoo.org/repo/proj/guru.git"
+MIN_RUSTC_VERSION_LIVE="1.95.0"
 
 say() {
   printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"
+}
+
+current_rustc_version() {
+  if ! command -v rustc >/dev/null 2>&1; then
+    return 1
+  fi
+
+  rustc --version 2>/dev/null | awk '{print $2}' | sed 's/-.*$//'
+}
+
+version_ge() {
+  local actual="$1"
+  local required="$2"
+
+  [[ -n "$actual" && -n "$required" ]] || return 1
+  [[ "$(printf '%s\n%s\n' "$required" "$actual" | sort -V | head -n 1)" == "$required" ]]
 }
 
 print_usage() {
@@ -115,8 +132,18 @@ status_yazi() {
   local binary_state="not installed"
   local version="n/a"
   local cpv
+  local rustc_ver
+  local rustc_live_state
 
   cpv="$(installed_pkg_cpv)"
+  rustc_ver="$(current_rustc_version || true)"
+  if [[ -z "$rustc_ver" ]]; then
+    rustc_live_state="rustc unavailable"
+  elif version_ge "$rustc_ver" "$MIN_RUSTC_VERSION_LIVE"; then
+    rustc_live_state="ok (>= ${MIN_RUSTC_VERSION_LIVE})"
+  else
+    rustc_live_state="too old for yazi-9999 (needs >= ${MIN_RUSTC_VERSION_LIVE})"
+  fi
   if command -v yazi >/dev/null 2>&1; then
     binary_state="installed"
     version="$(yazi --version 2>/dev/null || true)"
@@ -130,6 +157,11 @@ status_yazi() {
     printf "  package: %s\n" "$cpv"
   else
     printf "  package: not installed via Portage (or unavailable)\n"
+  fi
+  if [[ -n "$rustc_ver" ]]; then
+    printf "  rustc: %s (%s)\n" "$rustc_ver" "$rustc_live_state"
+  else
+    printf "  rustc: unavailable (%s)\n" "$rustc_live_state"
   fi
 
   if keyword_fix_present_exact; then
@@ -179,7 +211,20 @@ EOF
 }
 
 install_yazi() {
+  local rustc_ver
   need_root "$@"
+
+  rustc_ver="$(current_rustc_version || true)"
+  if [[ -z "$rustc_ver" ]]; then
+    say "WARN: rustc not found in PATH; skipping $YAZI_ATOM build."
+    say "Install Rust >= ${MIN_RUSTC_VERSION_LIVE} and rerun to build live yazi."
+    return 0
+  fi
+  if ! version_ge "$rustc_ver" "$MIN_RUSTC_VERSION_LIVE"; then
+    say "WARN: rustc ${rustc_ver} is too old for $YAZI_ATOM (requires >= ${MIN_RUSTC_VERSION_LIVE})."
+    say "Skipping live yazi update and keeping current repository yazi package state."
+    return 0
+  fi
   ensure_guru_repo
   ensure_keyword_fix
   say "Installing/updating $YAZI_ATOM ..."
