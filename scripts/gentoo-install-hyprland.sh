@@ -821,8 +821,9 @@ HYPR_PACKAGES=(
   gui-apps/waypaper
   gui-libs/hyprcursor::hyproverlay
   gui-libs/xdg-desktop-portal-hyprland::hyproverlay
-  gui-libs/hyprland-qt-support::hyproverlay
-  gui-libs/hyprland-qtutils
+  gui-libs/hyprutils
+  gui-libs/hyprland-qt-support
+  gui-libs/hyprland-guiutils
   gui-wm/hyprland::hyproverlay
   media-sound/cava
   media-video/pipewire
