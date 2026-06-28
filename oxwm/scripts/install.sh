@@ -120,6 +120,9 @@ ensure_x11_dependencies() {
     emerge)
       log "Ensuring OxWM X11 dependencies via emerge"
       run_privileged emerge -n \
+        x11-base/xorg-server \
+        x11-apps/xinit \
+        x11-apps/xauth \
         x11-libs/libX11 \
         x11-libs/libXinerama \
         x11-libs/libXft \
@@ -131,6 +134,8 @@ ensure_x11_dependencies() {
       log "Ensuring OxWM X11 dependencies via apt-get"
       run_privileged apt-get update
       run_privileged apt-get install -y --no-install-recommends \
+        xserver-xorg \
+        xauth \
         libx11-dev \
         libxinerama-dev \
         libxft-dev \
@@ -141,6 +146,8 @@ ensure_x11_dependencies() {
     dnf)
       log "Ensuring OxWM X11 dependencies via dnf"
       run_privileged dnf install -y \
+        xorg-x11-server-Xorg \
+        xorg-x11-xauth \
         libX11-devel \
         libXinerama-devel \
         libXft-devel \
@@ -151,6 +158,8 @@ ensure_x11_dependencies() {
     pacman)
       log "Ensuring OxWM X11 dependencies via pacman"
       run_privileged pacman --noconfirm --needed -S \
+        xorg-server \
+        xorg-xauth \
         libx11 \
         libxinerama \
         libxft \
@@ -161,6 +170,8 @@ ensure_x11_dependencies() {
     zypper)
       log "Ensuring OxWM X11 dependencies via zypper"
       run_privileged zypper --non-interactive install \
+        xorg-x11-server \
+        xauth \
         libX11-devel \
         libXinerama-devel \
         libXft-devel \
@@ -172,6 +183,23 @@ ensure_x11_dependencies() {
       warn "Unknown package manager; skipping automatic X11 dependency install"
       ;;
   esac
+}
+
+x11_environment_ready() {
+  local missing=()
+
+  if ! command -v X >/dev/null 2>&1 && ! command -v Xorg >/dev/null 2>&1; then
+    missing+=("X/Xorg")
+  fi
+  command -v xauth >/dev/null 2>&1 || missing+=("xauth")
+  command -v xrandr >/dev/null 2>&1 || missing+=("xrandr")
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    warn "Missing X11 runtime components: ${missing[*]}"
+    return 1
+  fi
+
+  return 0
 }
 
 zig_download_triplet() {
@@ -351,7 +379,14 @@ main() {
   require_cmd tar
 
   if [[ "${SKIP_DEPS}" == false ]]; then
-    ensure_x11_dependencies
+    if x11_environment_ready; then
+      log "X11 runtime dependencies already present; skipping package install"
+    else
+      ensure_x11_dependencies
+      if ! x11_environment_ready; then
+        warn "X11 runtime check still reports missing components after dependency install"
+      fi
+    fi
   else
     log "Skipping dependency installation (--skip-deps)"
   fi

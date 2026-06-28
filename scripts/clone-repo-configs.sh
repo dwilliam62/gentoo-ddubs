@@ -41,7 +41,8 @@ Options:
   --help, -h                 Show this help.
 
 Behavior:
-  If no login manager is detected, this script installs and enables x11-misc/ly.
+  This script ensures AppImage compatibility by installing fuse2/libfuse (sys-fs/fuse:0).
+  If no login manager is detected, this script installs and enables x11-misc/ly with X11 support.
   --ly-only forces ly setup without running the full config clone flow.
   --include-system-files does NOT overwrite /etc/fstab unless --include-fstab is set.
 EOF
@@ -219,10 +220,10 @@ login_manager_atom_installed() {
 
 ensure_ly_package_use_for_init() {
   local ly_use_file="/etc/portage/package.use/ly-login-manager"
-  local ly_flags="x11-misc/ly -X"
+  local ly_flags="x11-misc/ly X"
 
   if command -v systemctl >/dev/null 2>&1; then
-    ly_flags="x11-misc/ly -X systemd"
+    ly_flags="x11-misc/ly X systemd"
   fi
 
   if [[ "$DRY_RUN" = "true" ]]; then
@@ -232,6 +233,16 @@ ensure_ly_package_use_for_init() {
 
   mkdir -p /etc/portage/package.use
   printf '%s\n' "$ly_flags" >"$ly_use_file"
+}
+
+ensure_appimage_runtime_support() {
+  if ! command -v emerge >/dev/null 2>&1; then
+    say "WARN: emerge not available; skipping AppImage fuse2 runtime setup."
+    return 0
+  fi
+
+  say "Ensuring AppImage runtime compatibility (fuse2/libfuse)..."
+  run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y sys-fs/fuse:0 sys-fs/fuse-common
 }
 
 detect_ly_systemd_unit() {
@@ -549,6 +560,7 @@ main() {
 
   if [[ "$LY_ONLY" = "true" ]]; then
     say "Running in ly-only mode..."
+    ensure_appimage_runtime_support
     ensure_ly_installed_and_enabled
     say "Done (ly-only mode)."
     return 0
@@ -592,6 +604,7 @@ main() {
   set_gpu_specific_mesa_flags "$cards"
   say "GPU-aware config applied with VIDEO_CARDS=${cards}"
   ensure_required_repositories
+  ensure_appimage_runtime_support
   ensure_nerdfonts_workdir_override
 
   ensure_ly_if_no_login_manager
