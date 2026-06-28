@@ -370,6 +370,77 @@ EOF
   fi
 }
 
+ensure_localrepo_priority_override() {
+  local localrepo_override_conf="/etc/portage/repos.conf/localrepo-override.conf"
+
+  if [[ "$DRY_RUN" = "true" ]]; then
+    say "Would ensure localrepo priority override in ${localrepo_override_conf}"
+    return 0
+  fi
+
+  run_cmd mkdir -p /etc/portage/repos.conf
+  if [[ ! -f "$localrepo_override_conf" ]]; then
+    cat >"$localrepo_override_conf" <<'EOF'
+[localrepo]
+location = /var/db/repos/localrepo
+masters = gentoo
+auto-sync = no
+priority = 9999
+EOF
+    return 0
+  fi
+
+  if ! grep -q '^priority[[:space:]]*=' "$localrepo_override_conf"; then
+    printf '\npriority = 9999\n' >>"$localrepo_override_conf"
+  fi
+}
+
+ensure_nerdfonts_workdir_override() {
+  local guru_pkg_dir="/var/db/repos/guru/media-fonts/nerdfonts"
+  local guru_ebuild="${guru_pkg_dir}/nerdfonts-3.4.0.ebuild"
+  local guru_metadata="${guru_pkg_dir}/metadata.xml"
+  local localrepo_pkg_dir="/var/db/repos/localrepo/media-fonts/nerdfonts"
+  local localrepo_ebuild="${localrepo_pkg_dir}/nerdfonts-3.4.0.ebuild"
+  local localrepo_metadata="${localrepo_pkg_dir}/metadata.xml"
+
+  if [[ ! -f "$guru_ebuild" ]]; then
+    say "WARN: ${guru_ebuild} not found; skipping nerdfonts override."
+    return 0
+  fi
+
+  if grep -q '^S=' "$guru_ebuild"; then
+    say "guru nerdfonts ebuild already defines S; local override not required."
+    return 0
+  fi
+
+  ensure_localrepo_priority_override
+
+  if [[ "$DRY_RUN" = "true" ]]; then
+    say "Would create localrepo nerdfonts override with S=\"\${WORKDIR}\"."
+    return 0
+  fi
+
+  run_cmd mkdir -p "$localrepo_pkg_dir"
+  if [[ -f "$guru_metadata" ]]; then
+    run_cmd cp -f "$guru_metadata" "$localrepo_metadata"
+  fi
+
+  awk '
+    { print }
+    /^KEYWORDS=/ {
+      print ""
+      print "S=\"${WORKDIR}\""
+    }
+  ' "$guru_ebuild" >"$localrepo_ebuild"
+
+  if command -v ebuild >/dev/null 2>&1; then
+    run_cmd ebuild "$localrepo_ebuild" manifest
+    say "Applied localrepo nerdfonts override: ${localrepo_ebuild}"
+  else
+    say "WARN: ebuild command not found; created override ebuild but skipped Manifest generation."
+  fi
+}
+
 ensure_ly_if_no_login_manager() {
   if login_manager_atom_installed "x11-misc/ly"; then
     ensure_ly_installed_and_enabled
@@ -521,6 +592,7 @@ main() {
   set_gpu_specific_mesa_flags "$cards"
   say "GPU-aware config applied with VIDEO_CARDS=${cards}"
   ensure_required_repositories
+  ensure_nerdfonts_workdir_override
 
   ensure_ly_if_no_login_manager
 
