@@ -236,9 +236,9 @@ oxwm.key.bind({ modkey }, "W", oxwm.spawn("google-chrome-stable"))
 oxwm.key.bind({ modkey }, "V", oxwm.spawn("pavucontrol"))
 
 -- Media keys (volume control)
-oxwm.key.bind({}, "XF86AudioRaiseVolume", oxwm.spawn("pamixer -i 5"))
-oxwm.key.bind({}, "XF86AudioLowerVolume", oxwm.spawn("pamixer -d 5"))
-oxwm.key.bind({}, "XF86AudioMute", oxwm.spawn("pamixer -t"))
+oxwm.key.bind({}, "XF86AudioRaiseVolume", oxwm.spawn({ "sh", "-c", "pactl set-sink-volume @DEFAULT_SINK@ +5%" }))
+oxwm.key.bind({}, "XF86AudioLowerVolume", oxwm.spawn({ "sh", "-c", "pactl set-sink-volume @DEFAULT_SINK@ -5%" }))
+oxwm.key.bind({}, "XF86AudioMute", oxwm.spawn({ "sh", "-c", "pactl set-sink-mute @DEFAULT_SINK@ toggle" }))
 
 -- Variety Next/Prev
 oxwm.key.bind({ modkey, "Shift" }, "N", oxwm.spawn("variety --next"))
