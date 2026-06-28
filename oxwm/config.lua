@@ -279,8 +279,10 @@ oxwm.key.bind({ "Shift", "Control" }, "5", oxwm.layout.set("monocle"))
 oxwm.key.bind({ "Shift", "Control" }, "6", oxwm.layout.set("normie")) -- floating
 
 -- Pan the scrolling layout (no-op in other layouts)
-oxwm.key.bind({ modkey }, "bracketleft", oxwm.layout.scroll_left())
-oxwm.key.bind({ modkey }, "bracketright", oxwm.layout.scroll_right())
+if oxwm.layout.scroll_left and oxwm.layout.scroll_right then
+  oxwm.key.bind({ modkey }, "bracketleft", oxwm.layout.scroll_left())
+  oxwm.key.bind({ modkey }, "bracketright", oxwm.layout.scroll_right())
+end
 
 -- Multi-monitor (focus on Ctrl+Shift+arrows; send window stays on Mod+Shift+,/.)
 oxwm.key.bind({ "Control", "Shift" }, "Left", oxwm.monitor.focus(-1))
@@ -289,12 +291,18 @@ oxwm.key.bind({ modkey, "Shift" }, "Comma", oxwm.monitor.tag(-1))
 oxwm.key.bind({ modkey, "Shift" }, "Period", oxwm.monitor.tag(1))
 
 -- Tag navigation
-oxwm.key.bind({ modkey }, "Tab", oxwm.tag.view_next())
-oxwm.key.bind({ modkey, "Shift" }, "Tab", oxwm.tag.view_previous())
-oxwm.key.bind({ modkey, "Control" }, "Tab", oxwm.tag.view_next_nonempty())
+if oxwm.tag.view_next and oxwm.tag.view_previous then
+  oxwm.key.bind({ modkey }, "Tab", oxwm.tag.view_next())
+  oxwm.key.bind({ modkey, "Shift" }, "Tab", oxwm.tag.view_previous())
+end
+if oxwm.tag.view_next_nonempty then
+  oxwm.key.bind({ modkey, "Control" }, "Tab", oxwm.tag.view_next_nonempty())
+end
 -- Adjacent-tag view on Mod+,/. (comma/period = previous/next workspace)
-oxwm.key.bind({ modkey }, "Comma", oxwm.tag.view_previous())
-oxwm.key.bind({ modkey }, "Period", oxwm.tag.view_next())
+if oxwm.tag.view_previous and oxwm.tag.view_next then
+  oxwm.key.bind({ modkey }, "Comma", oxwm.tag.view_previous())
+  oxwm.key.bind({ modkey }, "Period", oxwm.tag.view_next())
+end
 
 -- Cycle through layouts
 oxwm.key.bind({ modkey }, "N", oxwm.layout.cycle())
