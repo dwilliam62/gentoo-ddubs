@@ -160,6 +160,12 @@ These helpers provide the primitives used by the rest of the script to query and
     - `media-libs/libpulse glib`
   - Guards against duplication by checking file contents before appending.
 
+- `ensure_virt_viewer_portage_fixes()`
+  - Adds required USE flags for virt-viewer/libvirt networking:
+    - `>=net-dns/dnsmasq-2.92_p2 script`
+    - `>=net-libs/gnutls-3.8.13 tools pkcs11`
+  - Adds a keyword entry for `net-dns/dnsmasq` (using the detected `ARCH`) to avoid masked dependency blocks.
+
 ### 3.4 Pre-building problematic math libraries
 
 - `prebuild_problematic_binaries()`
@@ -201,6 +207,7 @@ These helpers provide the primitives used by the rest of the script to query and
     - XFCE components for Thunar and panel: `thunar`, `tumbler`, `xfce4-panel`, `libxfce4windowing`, `libxfce4ui`, `exo`
   - Misc extras:
     - `sys-apps/flatpak` (Flatpak runtime)
+    - `app-emulation/virt-viewer`
     - `www-client/google-chrome`
     - `x11-misc/matugen`, `rofi`, `wallust`, `xdg-user-dirs`
     - `x11-terms/kitty`

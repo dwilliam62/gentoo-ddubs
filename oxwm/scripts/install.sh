@@ -128,6 +128,7 @@ ensure_x11_dependencies() {
         x11-libs/libXft \
         media-libs/fontconfig \
         media-libs/freetype \
+        x11-misc/picom \
         x11-apps/xrandr
       ;;
     apt-get)
@@ -141,6 +142,7 @@ ensure_x11_dependencies() {
         libxft-dev \
         libfontconfig1-dev \
         libfreetype6-dev \
+        picom \
         x11-xserver-utils
       ;;
     dnf)
@@ -153,6 +155,7 @@ ensure_x11_dependencies() {
         libXft-devel \
         fontconfig-devel \
         freetype-devel \
+        picom \
         xrandr
       ;;
     pacman)
@@ -165,6 +168,7 @@ ensure_x11_dependencies() {
         libxft \
         fontconfig \
         freetype2 \
+        picom \
         xorg-xrandr
       ;;
     zypper)
@@ -177,6 +181,7 @@ ensure_x11_dependencies() {
         libXft-devel \
         fontconfig-devel \
         freetype2-devel \
+        picom \
         xrandr
       ;;
     *)

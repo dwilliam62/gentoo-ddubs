@@ -527,6 +527,40 @@ ensure_pipewire_use_fix() {
     echo 'media-libs/libpulse glib' | sudo tee -a "${libpulse_use}" >/dev/null
   fi
 }
+
+ensure_virt_viewer_portage_fixes() {
+  echo "[INFO] Ensuring Portage settings for virt-viewer/libvirt networking"
+
+  sudo mkdir -p /etc/portage/package.use /etc/portage/package.accept_keywords
+
+  local use_file="/etc/portage/package.use/virt-viewer"
+  if [[ -f "${use_file}" ]] && grep -q 'net-dns/dnsmasq' "${use_file}"; then
+    echo "[OK] dnsmasq USE flags already present in ${use_file}"
+  else
+    {
+      echo ">=net-dns/dnsmasq-2.92_p2 script"
+      echo ">=net-libs/gnutls-3.8.13 tools pkcs11"
+    } | sudo tee -a "${use_file}" >/dev/null
+    echo "[OK] Added dnsmasq/gnutls USE flags to ${use_file}"
+  fi
+
+  local arch=""
+  if command -v portageq >/dev/null 2>&1; then
+    arch="$(portageq envvar ARCH 2>/dev/null || true)"
+  fi
+  if [[ -z "${arch}" ]]; then
+    echo "[WARN] Could not determine ARCH for keywording; skipping dnsmasq accept_keywords entry."
+    return 0
+  fi
+
+  local keyword_file="/etc/portage/package.accept_keywords/virt-viewer"
+  if [[ -f "${keyword_file}" ]] && grep -q '^net-dns/dnsmasq' "${keyword_file}"; then
+    echo "[OK] dnsmasq keyword already present in ${keyword_file}"
+  else
+    echo "net-dns/dnsmasq ~${arch}" | sudo tee -a "${keyword_file}" >/dev/null
+    echo "[OK] Added dnsmasq keyword to ${keyword_file}"
+  fi
+}
 ensure_discord_license_acceptance() {
   echo "[INFO] Ensuring Discord license acceptance in Portage"
   local line="net-im/discord all-rights-reserved"
@@ -886,6 +920,7 @@ HYPR_PACKAGES=(
   net-wireless/bluez
   net-wireless/bluez-tools
   net-misc/networkmanager
+  app-emulation/virt-viewer
   sys-apps/bat
   sys-apps/ripgrep
   sys-apps/ugrep
@@ -970,6 +1005,7 @@ ensure_hyproverlay_repo
 ensure_grub_bootloader_when_efi_manager_detected
 ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
+ensure_virt_viewer_portage_fixes
 ensure_discord_license_acceptance
 ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
