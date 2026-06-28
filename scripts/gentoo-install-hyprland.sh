@@ -527,6 +527,35 @@ ensure_pipewire_use_fix() {
     echo 'media-libs/libpulse glib' | sudo tee -a "${libpulse_use}" >/dev/null
   fi
 }
+ensure_discord_license_acceptance() {
+  echo "[INFO] Ensuring Discord license acceptance in Portage"
+  local line="net-im/discord all-rights-reserved"
+  local package_license_path="/etc/portage/package.license"
+  local package_license_file="/etc/portage/package.license/discord"
+
+  if [[ -d "$package_license_path" ]]; then
+    if [[ -f "$package_license_file" ]] && sudo grep -q '^net-im/discord[[:space:]].*all-rights-reserved' "$package_license_file"; then
+      echo "[OK] Discord license acceptance already configured."
+    else
+      echo "$line" | sudo tee "$package_license_file" >/dev/null
+      echo "[OK] Added Discord license acceptance to ${package_license_file}."
+    fi
+    return 0
+  fi
+
+  sudo mkdir -p /etc/portage
+  if [[ -f "$package_license_path" ]]; then
+    if sudo grep -q '^net-im/discord[[:space:]].*all-rights-reserved' "$package_license_path"; then
+      echo "[OK] Discord license acceptance already configured."
+    else
+      echo "$line" | sudo tee -a "$package_license_path" >/dev/null
+      echo "[OK] Added Discord license acceptance to ${package_license_path}."
+    fi
+  else
+    echo "$line" | sudo tee "$package_license_path" >/dev/null
+    echo "[OK] Added Discord license acceptance to ${package_license_path}."
+  fi
+}
 ensure_localrepo_priority_override() {
   local localrepo_override_conf="/etc/portage/repos.conf/localrepo-override.conf"
 
@@ -941,6 +970,7 @@ ensure_hyproverlay_repo
 ensure_grub_bootloader_when_efi_manager_detected
 ensure_pamixer_cxx17_fix
 ensure_pipewire_use_fix
+ensure_discord_license_acceptance
 ensure_kernel_postinst_efi_update
 prebuild_problematic_binaries
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"

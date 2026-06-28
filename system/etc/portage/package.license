@@ -1,4 +1,5 @@
 sys-kernel/linux-firmware @BINARY-REDISTRIBUTABLE
 app-editors/vscode Microsoft-vscode
 www-client/google-chrome google-chrome
+net-im/discord all-rights-reserved
 
