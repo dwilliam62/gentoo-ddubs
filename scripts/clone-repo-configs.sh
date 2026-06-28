@@ -42,6 +42,7 @@ Options:
 
 Behavior:
   This script ensures AppImage compatibility by installing fuse2/libfuse (sys-fs/fuse:0).
+  This script ensures desktop audio compatibility by installing PipeWire/WirePlumber and ALSA pulse plugins.
   If no login manager is detected, this script installs and enables x11-misc/ly with X11 support.
   --ly-only forces ly setup without running the full config clone flow.
   --include-system-files does NOT overwrite /etc/fstab unless --include-fstab is set.
@@ -243,6 +244,34 @@ ensure_appimage_runtime_support() {
 
   say "Ensuring AppImage runtime compatibility (fuse2/libfuse)..."
   run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y sys-fs/fuse:0 sys-fs/fuse-common
+}
+
+ensure_audio_runtime_support() {
+  local audio_use_file="/etc/portage/package.use/audio-runtime"
+
+  if ! command -v emerge >/dev/null 2>&1; then
+    say "WARN: emerge not available; skipping audio runtime setup."
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" = "true" ]]; then
+    say "Would write ${audio_use_file} for PipeWire/ALSA compatibility."
+  else
+    mkdir -p /etc/portage/package.use
+    cat >"$audio_use_file" <<'EOF'
+media-video/pipewire dbus sound-server pulseaudio extra alsa-pipewire
+>=media-plugins/alsa-plugins-1.2.12 pulseaudio
+EOF
+  fi
+
+  say "Ensuring desktop audio runtime compatibility (PipeWire/WirePlumber/ALSA plugins)..."
+  run_cmd emerge -v --ask=n --autounmask-write --autounmask-continue --binpkg-respect-use=y \
+    media-libs/alsa-lib \
+    media-sound/alsa-utils \
+    media-video/pipewire \
+    media-video/wireplumber \
+    media-plugins/alsa-plugins \
+    media-sound/pavucontrol
 }
 
 detect_ly_systemd_unit() {
@@ -561,6 +590,7 @@ main() {
   if [[ "$LY_ONLY" = "true" ]]; then
     say "Running in ly-only mode..."
     ensure_appimage_runtime_support
+    ensure_audio_runtime_support
     ensure_ly_installed_and_enabled
     say "Done (ly-only mode)."
     return 0
@@ -605,6 +635,7 @@ main() {
   say "GPU-aware config applied with VIDEO_CARDS=${cards}"
   ensure_required_repositories
   ensure_appimage_runtime_support
+  ensure_audio_runtime_support
   ensure_nerdfonts_workdir_override
 
   ensure_ly_if_no_login_manager
