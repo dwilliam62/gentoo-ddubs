@@ -10,6 +10,7 @@ CLONE_DIR="$CLONE_DIR_DEFAULT"
 DRY_RUN="false"
 KEEP_CLONE="true"
 INCLUDE_SYSTEM_FILES="false"
+INCLUDE_FSTAB="false"
 VIDEO_CARDS_OVERRIDE=""
 LY_ONLY="false"
 
@@ -31,7 +32,8 @@ Options:
   --repo-url <url>           Repository URL to clone.
   --clone-dir <path>         Local clone directory (default: /opt/gentoo-ddubs).
   --video-cards "<cards>"    Override detected VIDEO_CARDS value.
-  --include-system-files     Also copy system/etc/fstab and system/etc/locale.gen.
+  --include-system-files     Also copy safe system snapshot files (currently locale.gen).
+  --include-fstab            Explicitly replace /etc/fstab from snapshot (dangerous).
   --ly-only                  Only install/configure ly, skip clone and config sync.
   --keep-clone               Keep clone directory after apply (default).
   --remove-clone             Remove clone directory after apply.
@@ -41,6 +43,7 @@ Options:
 Behavior:
   If no login manager is detected, this script installs and enables x11-misc/ly.
   --ly-only forces ly setup without running the full config clone flow.
+  --include-system-files does NOT overwrite /etc/fstab unless --include-fstab is set.
 EOF
 }
 
@@ -437,6 +440,11 @@ parse_args() {
         INCLUDE_SYSTEM_FILES="true"
         shift
         ;;
+      --include-fstab)
+        INCLUDE_FSTAB="true"
+        INCLUDE_SYSTEM_FILES="true"
+        shift
+        ;;
       --ly-only)
         LY_ONLY="true"
         shift
@@ -497,9 +505,14 @@ main() {
   copy_file_with_backup "$src_world" "/var/lib/portage/world" "$backup_root"
 
   if [[ "$INCLUDE_SYSTEM_FILES" = "true" ]]; then
-    say "Applying optional system snapshot files (fstab/locale.gen)"
-    copy_file_with_backup "$src_fstab" "/etc/fstab" "$backup_root"
+    say "Applying optional system snapshot files (locale.gen)"
     copy_file_with_backup "$src_locale" "/etc/locale.gen" "$backup_root"
+    if [[ "$INCLUDE_FSTAB" = "true" ]]; then
+      say "Applying fstab snapshot because --include-fstab was explicitly requested"
+      copy_file_with_backup "$src_fstab" "/etc/fstab" "$backup_root"
+    else
+      say "Skipping /etc/fstab snapshot (use --include-fstab to apply it explicitly)"
+    fi
   fi
 
   local cards
