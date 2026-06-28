@@ -527,6 +527,76 @@ ensure_pipewire_use_fix() {
     echo 'media-libs/libpulse glib' | sudo tee -a "${libpulse_use}" >/dev/null
   fi
 }
+ensure_localrepo_priority_override() {
+  local localrepo_override_conf="/etc/portage/repos.conf/localrepo-override.conf"
+
+  sudo mkdir -p /etc/portage/repos.conf
+  if [[ ! -f "$localrepo_override_conf" ]]; then
+    sudo tee "$localrepo_override_conf" >/dev/null <<'EOF'
+[localrepo]
+location = /var/db/repos/localrepo
+masters = gentoo
+auto-sync = no
+priority = 9999
+EOF
+    return 0
+  fi
+
+  if ! sudo grep -q '^priority[[:space:]]*=' "$localrepo_override_conf"; then
+    echo 'priority = 9999' | sudo tee -a "$localrepo_override_conf" >/dev/null
+  fi
+}
+
+ensure_nerdfonts_workdir_override() {
+  local guru_pkg_dir="/var/db/repos/guru/media-fonts/nerdfonts"
+  local guru_ebuild="${guru_pkg_dir}/nerdfonts-3.4.0.ebuild"
+  local guru_metadata="${guru_pkg_dir}/metadata.xml"
+  local localrepo_pkg_dir="/var/db/repos/localrepo/media-fonts/nerdfonts"
+  local localrepo_ebuild="${localrepo_pkg_dir}/nerdfonts-3.4.0.ebuild"
+  local localrepo_metadata="${localrepo_pkg_dir}/metadata.xml"
+  local source_ebuild=""
+  local tmp_ebuild
+
+  if [[ -f "$guru_ebuild" ]]; then
+    source_ebuild="$guru_ebuild"
+  elif [[ -f "$localrepo_ebuild" ]]; then
+    source_ebuild="$localrepo_ebuild"
+  else
+    echo "[WARN] nerdfonts ebuild not found in guru/localrepo; skipping override."
+    return 0
+  fi
+
+  ensure_localrepo_priority_override
+  sudo mkdir -p "$localrepo_pkg_dir"
+
+  if [[ -f "$guru_metadata" ]]; then
+    sudo cp -f "$guru_metadata" "$localrepo_metadata"
+  elif [[ ! -f "$localrepo_metadata" ]]; then
+    sudo tee "$localrepo_metadata" >/dev/null <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata/>
+EOF
+  fi
+
+  tmp_ebuild="$(mktemp)"
+  awk '
+    { print }
+    /^KEYWORDS=/ {
+      print ""
+      print "S=\"${WORKDIR}\""
+    }
+  ' "$source_ebuild" >"$tmp_ebuild"
+  sudo install -m 644 "$tmp_ebuild" "$localrepo_ebuild"
+  rm -f "$tmp_ebuild"
+
+  if command -v ebuild >/dev/null 2>&1; then
+    sudo ebuild "$localrepo_ebuild" manifest
+    echo "[OK] Ensured nerdfonts localrepo override with S=\"\${WORKDIR}\""
+  else
+    echo "[WARN] ebuild command missing; override created but Manifest was not regenerated."
+  fi
+}
 ensure_gdk_pixbuf_loaders_cache() {
   if command -v gdk-pixbuf-query-loaders >/dev/null 2>&1; then
     echo "[INFO] Updating gdk-pixbuf loaders cache"
@@ -878,6 +948,7 @@ install_latest_yazi_from_script
 install_list "Kernel maintenance" "${KERNEL_MAINT_PACKAGES[@]}"
 ensure_gdk_pixbuf_loaders_cache
 configure_shell_runtime_exports
+ensure_nerdfonts_workdir_override
 
 install_list "Fonts" "${FONTS[@]}"
 
