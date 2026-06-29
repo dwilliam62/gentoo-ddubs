@@ -15,6 +15,7 @@ set -euo pipefail
 #   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
 #   --dry-run     Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
 #   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
+#   --just-oxwm   Update and rebuild OxWM only.
 #
 # Options:
 #   --no-sync         Do not run emerge --sync first.
@@ -154,13 +155,16 @@ Examples:
   bash scripts/update.sh --dry-run --no-sync
   bash scripts/update.sh --apply --use-binpkgs --auto-yes
   bash scripts/update.sh --apply --skip-quickshell
+  bash scripts/update.sh --just-oxwm
 EOF
 }
 
 need_root() {
   # Escalate when applying changes or when syncing in --eval/--dry-run modes
   local need_sudo=false
-  if [ "${APPLY:-false}" = "true" ]; then
+  if [ "${JUST_OXWM:-false}" = "true" ]; then
+    need_sudo=true
+  elif [ "${APPLY:-false}" = "true" ]; then
     need_sudo=true
   elif [ "${NO_SYNC:-false}" = "false" ] && ([ "${EVAL_ONLY:-false}" = "true" ] || [ "${DRY_RUN:-false}" = "true" ]); then
     need_sudo=true
@@ -176,6 +180,7 @@ need_root() {
 DRY_RUN="false"
 EVAL_ONLY="false"
 APPLY="false"
+JUST_OXWM="false"
 NO_SYNC="false"
 USE_BINPKGS="false"
 AUTO_YES="false"
@@ -186,6 +191,7 @@ for a in "$@"; do
     --dry-run) DRY_RUN="true" ;;
     --eval) EVAL_ONLY="true" ;;
     --apply) APPLY="true" ;;
+    --just-oxwm) JUST_OXWM="true" ;;
     --no-sync) NO_SYNC="true" ;;
     --use-binpkgs) USE_BINPKGS="true" ;;
     --auto-yes) AUTO_YES="true" ;;
@@ -194,9 +200,8 @@ for a in "$@"; do
     *) args+=("$a") ;;
   esac
 done
-
 # If no mode was selected, show help and exit (do nothing by default)
-if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false" ]; then
+if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false" ] && [ "$JUST_OXWM" = "false" ]; then
   print_usage
   exit 2
 fi
@@ -414,6 +419,11 @@ maybe_refresh_grub_for_new_kernel() {
 main() {
   # Ensure we have root when needed (apply mode or sync in eval/dry-run)
   need_root update "$@"
+  if [ "$JUST_OXWM" = "true" ]; then
+    update_oxwm_repo
+    say "Done."
+    exit 0
+  fi
 
   # Sync if requested/default (only when a mode was selected)
   maybe_sync
