@@ -92,7 +92,15 @@ build_oxwm() {
   local build_user
   build_user="$(oxwm_build_user)"
   say "Building OXWM (zig build -Doptimize=ReleaseFast)..."
-  sudo -u "$build_user" env PATH="$PATH" bash -c "cd \"$OXWM_DIR\" && zig build -Doptimize=ReleaseFast"
+  local zig_bin="/opt/zig/0.16.0/zig"
+  if [[ ! -x "$zig_bin" ]]; then
+    zig_bin="$(command -v zig || true)"
+  fi
+  if [[ -z "$zig_bin" ]]; then
+    say "WARN: zig not found; skipping OXWM build."
+    return 0
+  fi
+  sudo -u "$build_user" env PATH="$PATH" ZIG_BIN="$zig_bin" bash -c "cd \"$OXWM_DIR\" && \"${ZIG_BIN}\" build -Doptimize=ReleaseFast"
   if [ -f "${OXWM_DIR}/zig-out/bin/oxwm" ]; then
     install -Dm755 "${OXWM_DIR}/zig-out/bin/oxwm" /usr/local/bin/oxwm
     say "Installed /usr/local/bin/oxwm"

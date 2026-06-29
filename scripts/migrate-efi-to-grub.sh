@@ -78,6 +78,49 @@ install_grub() {
   mkdir -p /boot/grub
   grub-mkconfig -o /boot/grub/grub.cfg
 }
+ensure_grub_efi_entry() {
+  local efi_source disk part entry_id
+  efi_source="$(findmnt -no SOURCE /boot/efi 2>/dev/null || true)"
+  if [[ -z "$efi_source" ]]; then
+    die "Could not determine EFI device from /boot/efi"
+  fi
+
+  if [[ "$efi_source" =~ ^(/dev/.+p)([0-9]+)$ ]]; then
+    disk="${BASH_REMATCH[1]%p}"
+    part="${BASH_REMATCH[2]}"
+  elif [[ "$efi_source" =~ ^(/dev/.+)([0-9]+)$ ]]; then
+    disk="${BASH_REMATCH[1]}"
+    part="${BASH_REMATCH[2]}"
+  else
+    die "Unrecognized EFI device format: $efi_source"
+  fi
+
+  entry_id="$(efibootmgr -v | awk -F'[ *]' '/GentooGRUB/ && /\\\\EFI\\\\GentooGRUB\\\\grubx64\\.efi/ {print $1}' | sed 's/^Boot//' | head -n 1)"
+  if [[ -z "$entry_id" ]]; then
+    log "Creating UEFI entry for GRUB"
+    efibootmgr --create --disk "$disk" --part "$part" --label "GentooGRUB" --loader "\\EFI\\GentooGRUB\\grubx64.efi"
+    entry_id="$(efibootmgr -v | awk -F'[ *]' '/GentooGRUB/ && /\\\\EFI\\\\GentooGRUB\\\\grubx64\\.efi/ {print $1}' | sed 's/^Boot//' | head -n 1)"
+  fi
+
+  if [[ -n "$entry_id" ]]; then
+    log "Setting BootOrder to prioritize GRUB entry Boot${entry_id}"
+    efibootmgr --bootorder "${entry_id}"
+    efibootmgr --bootnext "${entry_id}" || true
+  else
+    log "WARN: Could not determine GRUB entry ID; BootOrder unchanged."
+  fi
+}
+remove_efistub_entries() {
+  local bootnums
+  bootnums="$(efibootmgr -v | awk -F'[ *]' '/\\vmlinuz\\.efi/ {print $1}' | sed 's/^Boot//')"
+  if [[ -z "$bootnums" ]]; then
+    return
+  fi
+  for num in $bootnums; do
+    log "Removing EFI-stub entry Boot${num}"
+    efibootmgr --delete-bootnum --bootnum "${num}" || true
+  done
+}
 
 verify_latest_kernel_artifacts() {
   local latest kernel initrd
@@ -108,7 +151,9 @@ main() {
   ensure_kernel_install_layout_grub
   ensure_kernel_package
   install_grub
+  ensure_grub_efi_entry
   verify_latest_kernel_artifacts
+  remove_efistub_entries
   cleanup_efistub_hooks
   log "Done. GRUB is installed and configured."
 }
