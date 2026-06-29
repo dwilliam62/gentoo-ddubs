@@ -75,7 +75,25 @@ install_grub() {
   log "Installing GRUB to ${efi_dir}"
   emerge --verbose sys-boot/grub
   grub-install --target="$target" --efi-directory="$efi_dir" --bootloader-id="GentooGRUB" --recheck
+  mkdir -p /boot/grub
   grub-mkconfig -o /boot/grub/grub.cfg
+}
+
+verify_latest_kernel_artifacts() {
+  local latest kernel initrd
+  latest="$(find /boot -maxdepth 1 -type f -name 'kernel-*' -printf '%f\n' | sort -V | tail -n 1 | sed 's/^kernel-//')"
+  if [[ -z "$latest" ]]; then
+    die "No kernel-* images found in /boot"
+  fi
+  kernel="/boot/kernel-${latest}"
+  initrd="/boot/initramfs-${latest}.img"
+
+  [[ -f "$kernel" ]] || die "Missing ${kernel}"
+  [[ -f "$initrd" ]] || die "Missing ${initrd}"
+
+  log "Latest kernel: ${latest}"
+  log "Kernel OK: ${kernel}"
+  log "Initrd OK: ${initrd}"
 }
 
 cleanup_efistub_hooks() {
@@ -90,6 +108,7 @@ main() {
   ensure_kernel_install_layout_grub
   ensure_kernel_package
   install_grub
+  verify_latest_kernel_artifacts
   cleanup_efistub_hooks
   log "Done. GRUB is installed and configured."
 }
