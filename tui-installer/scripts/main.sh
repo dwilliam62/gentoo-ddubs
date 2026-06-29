@@ -197,6 +197,55 @@ dracut \\
 EOF
 }
 
+function ensure_grub_install_layout() {
+	local conf="/etc/kernel/install.conf"
+	mkdir_or_die 0755 "/etc/kernel"
+	if [[ -f "$conf" ]] && grep -q '^layout=' "$conf"; then
+		sed -i 's/^layout=.*/layout=grub/' "$conf" \
+			|| die "Could not update layout in $conf"
+	elif [[ -f "$conf" ]]; then
+		printf '\nlayout=grub\n' >> "$conf" \
+			|| die "Could not append layout to $conf"
+	else
+		echo 'layout=grub' > "$conf" \
+			|| die "Could not write $conf"
+	fi
+}
+
+function ensure_kernel_channel_keywords() {
+	if [[ "${KERNEL_CHANNEL:-current}" != "7.1" ]]; then
+		return
+	fi
+	local arch=""
+	if [[ -n "${GENTOO_ARCH:-}" ]]; then
+		arch="$GENTOO_ARCH"
+	elif command -v portageq >/dev/null 2>&1; then
+		arch="$(portageq envvar ARCH 2>/dev/null || true)"
+	fi
+
+	if [[ -z "$arch" ]]; then
+		ewarn "Could not determine ARCH; skipping kernel keywording for 7.1.x."
+		return
+	fi
+
+	mkdir_or_die 0755 "/etc/portage/package.accept_keywords"
+	cat >> /etc/portage/package.accept_keywords/gentoo-kernel-7.1 <<EOF
+sys-kernel/gentoo-kernel ~${arch}
+sys-kernel/gentoo-kernel-bin ~${arch}
+EOF
+}
+
+function ensure_kernel_excludes() {
+	if [[ -z "${KERNEL_EXCLUDE_VERSION:-}" ]]; then
+		return
+	fi
+
+	mkdir_or_die 0755 "/etc/portage/package.mask"
+	cat >> /etc/portage/package.mask/gentoo-kernel.exclude <<EOF
+=sys-kernel/gentoo-kernel-${KERNEL_EXCLUDE_VERSION}*
+=sys-kernel/gentoo-kernel-bin-${KERNEL_EXCLUDE_VERSION}*
+EOF
+}
 function get_cmdline() {
 	local cmdline=("rd.vconsole.keymap=$KEYMAP_INITRAMFS")
 	cmdline+=("${DISK_DRACUT_CMDLINE[@]}")
@@ -209,77 +258,28 @@ function get_cmdline() {
 }
 
 function install_kernel_efi() {
-	try emerge --verbose sys-boot/efibootmgr
+	try emerge --verbose sys-boot/grub
 
-	# Copy kernel to EFI
-	local kernel_file
-	kernel_file="$(find "/boot" \( -name "vmlinuz-*" -or -name 'kernel-*' \) -printf '%f\n' | sort -V | tail -n 1)" \
-		|| die "Could not list newest kernel file"
+	local kver
+	kver="$(readlink /usr/src/linux)" \
+		|| die "Could not figure out kernel version from /usr/src/linux symlink."
+	kver="${kver#linux-}"
 
-	try cp "/boot/$kernel_file" "/boot/efi/vmlinuz.efi"
+	generate_initramfs "/boot/initramfs-${kver}.img"
+	ensure_grub_install_layout
 
-	# Generate initramfs
-	generate_initramfs "/boot/efi/initramfs.img"
+	local target
+	case "$(uname -m)" in
+		x86_64) target="x86_64-efi" ;;
+		aarch64|arm64) target="arm64-efi" ;;
+		*)
+			die "Unsupported architecture for GRUB EFI install: $(uname -m)"
+			;;
+	esac
 
-	# Create boot entry
-	einfo "Creating EFI boot entry"
-	local efipartdev
-	efipartdev="$(resolve_device_by_id "$DISK_ID_EFI")" \
-		|| die "Could not resolve device with id=$DISK_ID_EFI"
-	efipartdev="$(realpath "$efipartdev")" \
-		|| die "Error in realpath '$efipartdev'"
-
-	# Get the sysfs path to EFI partition
-	local sys_efipart
-	sys_efipart="/sys/class/block/$(basename "$efipartdev")" \
-		|| die "Could not construct /sys path to EFI partition"
-
-	# Extract partition number, handling both standard and RAID cases
-	local efipartnum
-	if [[ -e "$sys_efipart/partition" ]]; then
-		efipartnum="$(cat "$sys_efipart/partition")" \
-			|| die "Failed to find partition number for EFI partition $efipartdev"
-	else
-		efipartnum="1" # Assume partition 1 if not found, common for RAID-based EFI
-		einfo "Assuming partition 1 for RAID-based EFI on device $efipartdev"
-	fi
-
-	# Identify the parent block device and create EFI boot entry
-	local gptdev
-	if mdadm --detail --scan "$efipartdev" | grep -qE "^ARRAY $efipartdev " && [[ "$efipartdev" =~ ^/dev/md[0-9]+$ ]]; then
-		# RAID 1 case: Create EFI boot entries for each RAID member
-		local raid_members
-		raid_members=($(mdadm --detail "$efipartdev" | sed -n 's|.*active sync[^/]*\(/dev/[^ ]*\).*|\1|p' | sort))
-
-		if [[ ${#raid_members[@]} -eq 0 ]]; then
-			die "RAID setup detected, but no valid member disks found for $efipartdev"
-		fi
-
-		einfo "RAID detected. RAID members: ${raid_members[*]}"
-
-		for disk in "${raid_members[@]}"; do
-			gptdev="$disk"
-			einfo "Adding EFI boot entry for RAID member: $gptdev"
-			try efibootmgr --verbose --create --disk "$gptdev" --part "$efipartnum" --label "gentoo" --loader '\vmlinuz.efi' --unicode "initrd=\\initramfs.img $(get_cmdline)"
-		done
-	else
-		# Non-RAID case: Create a single EFI boot entry
-		gptdev="/dev/$(basename "$(readlink -f "$sys_efipart/..")")" \
-			|| die "Failed to find parent device for EFI partition $efipartdev"
-		if [[ ! -e "$gptdev" ]] || [[ -z "$gptdev" ]]; then
-			gptdev="$(resolve_device_by_id "${DISK_ID_PART_TO_GPT_ID[$DISK_ID_EFI]}")" \
-				|| die "Could not resolve device with id=${DISK_ID_PART_TO_GPT_ID[$DISK_ID_EFI]}"
-		fi
-		try efibootmgr --verbose --create --disk "$gptdev" --part "$efipartnum" --label "gentoo" --loader '\vmlinuz.efi' --unicode 'initrd=\initramfs.img'" $(get_cmdline)"
-	fi
-
-	# Create script to repeat adding efibootmgr entry
-	cat > "/boot/efi/efibootmgr_add_entry.sh" <<EOF
-#!/bin/bash
-# This is the command that was used to create the efibootmgr entry when the
-# system was installed using gentoo-install.
-efibootmgr --verbose --create --disk "$gptdev" --part "$efipartnum" --label "gentoo" --loader '\\vmlinuz.efi' --unicode 'initrd=\\initramfs.img'" $(get_cmdline)"
-EOF
+	einfo "Installing GRUB EFI bootloader"
+	try grub-install --target="$target" --efi-directory="/boot/efi" --bootloader-id="GentooGRUB" --recheck
+	try grub-mkconfig -o /boot/grub/grub.cfg
 }
 
 function generate_syslinux_cfg() {
@@ -445,12 +445,24 @@ EOF
 
 	# Install required programs and kernel now, in order to
 	# prevent emerging module before an imminent kernel upgrade
+	ensure_kernel_channel_keywords
+	ensure_kernel_excludes
 	if [[ "${KERNEL_TYPE:-bin}" == "source" ]]; then
-		einfo "Building kernel from source (sys-kernel/gentoo-kernel)"
-		try emerge --verbose sys-kernel/dracut sys-kernel/gentoo-kernel app-arch/zstd
+		if [[ "${KERNEL_CHANNEL:-current}" == "7.1" ]]; then
+			einfo "Building kernel from source (sys-kernel/gentoo-kernel 7.1.x)"
+			try emerge --verbose sys-kernel/dracut "=sys-kernel/gentoo-kernel-7.1*" app-arch/zstd
+		else
+			einfo "Building kernel from source (sys-kernel/gentoo-kernel)"
+			try emerge --verbose sys-kernel/dracut sys-kernel/gentoo-kernel app-arch/zstd
+		fi
 	else
-		einfo "Installing binary kernel (sys-kernel/gentoo-kernel-bin)"
-		try emerge --verbose sys-kernel/dracut sys-kernel/gentoo-kernel-bin app-arch/zstd
+		if [[ "${KERNEL_CHANNEL:-current}" == "7.1" ]]; then
+			einfo "Installing binary kernel (sys-kernel/gentoo-kernel-bin 7.1.x)"
+			try emerge --verbose sys-kernel/dracut "=sys-kernel/gentoo-kernel-bin-7.1*" app-arch/zstd
+		else
+			einfo "Installing binary kernel (sys-kernel/gentoo-kernel-bin)"
+			try emerge --verbose sys-kernel/dracut sys-kernel/gentoo-kernel-bin app-arch/zstd
+		fi
 	fi
 
 	# Install cryptsetup if we used LUKS

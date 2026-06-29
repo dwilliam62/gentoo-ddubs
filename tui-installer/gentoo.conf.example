@@ -306,6 +306,14 @@ ENABLE_BINPKG=false
 #   "source" - Build kernel from source (sys-kernel/gentoo-kernel)
 KERNEL_TYPE=bin
 
+# Kernel channel to install:
+#   "current" - Track latest available gentoo-kernel (default)
+#   "7.1"     - Pin to 7.1.x series
+KERNEL_CHANNEL="current"
+
+# Optional: exclude a specific version (e.g. "7.1.1")
+KERNEL_EXCLUDE_VERSION=""
+
 # An ssh key to add to the authorized_keys file for the root user.
 # This variable will become the content of the authorized_keys file,
 # so you may specify one key per line (include the newlines in the variable).

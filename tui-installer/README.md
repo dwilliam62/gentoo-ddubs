@@ -139,17 +139,11 @@ experience. Your mileage may vary.
 Use EFI. BIOS is old and deprecated for a long time now.
 Only certain VPS hosters may require you to use BIOS still (time to write to them about that!)
 
-#### EFIstub booting
+#### EFI bootloader (GRUB)
 
-Don't install a bootloader when this script is done, except you absolutely need one.
-The kernel can directly be booted by EFI without need for a bootloader.
-By default, this script will use efibootmgr to add a bootentry directly to your "mainboard's bootselect" (typically F12).
-Nowadays, there's just no reason to use GRUB, syslinux, or similar bootloaders by default.
-They only add additional time to your boot, and even dualbooting Windows works just fine without one.
-Only if you require frequent editing of kernel parameters, or want kernel autodiscovery from attached media
-you might want to consider using one of these. For the average (advanced) user this isn't necessary.
-
-If you want to add more boot options or want to learn about efibootmgr, refer to [this page on the gentoo wiki](https://wiki.gentoo.org/wiki/Efibootmgr).
+This installer now uses GRUB on EFI systems.
+GRUB provides predictable kernel discovery and makes multi-kernel management easier.
+If you prefer EFIstub booting, you can customize the script accordingly.
 
 #### Modern file systems
 
@@ -202,7 +196,7 @@ If you encounter this problem, you might be able to fix the problem by switching
 # Press S<Enter> when asked about what to do next.
 # This opens an emergency shell in the chroot.
 echo 'ACCEPT_KEYWORDS="~amd64"' >> /etc/portage/make.conf # Enable testing for your architecture.
-emerge -v gentoo-kernel-bin                               # Update kernel to newest version (or gentoo-kernel if KERNEL_TYPE=source)
+emerge -v '=gentoo-kernel-bin-7.1*'                       # Update kernel to newest 7.1.x (or gentoo-kernel if KERNEL_TYPE=source)
 exit # Ctrl-D
 # Now select 'retry' when asked about what to do next.
 ```
