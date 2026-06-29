@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Jun 2026
 
-<<<<<<< HEAD
 - Updated: 
   - `gentoo-install-hyprland` script 
+    - Chaned default from `efibootmgr` to `grub`
   - `yazi` build script to install current yazi bld 
 - Added:
+   - Script to migrate `efibootmgr` to grub with current kernel 
    - `oxwm` install script 
       - Removed `oxwm` install from hyprland install
    - `clone-gentoo.sh` script 
@@ -23,7 +24,6 @@ All notable changes to this project will be documented in this file.
    - python target fix to `make.conf`
    - `PYTHON_TARGETS="python3_13 python3_14"`
    - `PYTHON_SINGLE_TARGET="python3_14"`
-||||||| parent of fa38ee9d (Added tui-installer from GH oddlama/gentoo-install)
 - Added python overrides for: 
    - `nwg-display`
    - `variety` 

@@ -210,6 +210,22 @@ function ensure_grub_install_layout() {
 		echo 'layout=grub' > "$conf" \
 			|| die "Could not write $conf"
 	fi
+
+	if [[ -f "$conf" ]] && grep -q '^initrd_generator=' "$conf"; then
+		sed -i 's/^initrd_generator=.*/initrd_generator=dracut/' "$conf" \
+			|| die "Could not update initrd_generator in $conf"
+	else
+		printf 'initrd_generator=dracut\n' >> "$conf" \
+			|| die "Could not append initrd_generator to $conf"
+	fi
+
+	if [[ -f "$conf" ]] && grep -q '^uki_generator=' "$conf"; then
+		sed -i 's/^uki_generator=.*/uki_generator=none/' "$conf" \
+			|| die "Could not update uki_generator in $conf"
+	else
+		printf 'uki_generator=none\n' >> "$conf" \
+			|| die "Could not append uki_generator to $conf"
+	fi
 }
 
 function ensure_kernel_channel_keywords() {

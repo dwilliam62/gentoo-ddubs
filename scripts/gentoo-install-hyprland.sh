@@ -738,6 +738,18 @@ ensure_kernel_install_layout_grub() {
   else
     echo 'layout=grub' | sudo tee "$conf" >/dev/null
   fi
+
+  if [[ -f "$conf" ]] && grep -q '^initrd_generator=' "$conf"; then
+    sudo sed -i 's/^initrd_generator=.*/initrd_generator=dracut/' "$conf"
+  else
+    printf 'initrd_generator=dracut\n' | sudo tee -a "$conf" >/dev/null
+  fi
+
+  if [[ -f "$conf" ]] && grep -q '^uki_generator=' "$conf"; then
+    sudo sed -i 's/^uki_generator=.*/uki_generator=none/' "$conf"
+  else
+    printf 'uki_generator=none\n' | sudo tee -a "$conf" >/dev/null
+  fi
 }
 
 ensure_grub_bootloader_when_efi_manager_detected() {

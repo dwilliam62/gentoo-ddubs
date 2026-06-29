@@ -37,6 +37,18 @@ ensure_kernel_install_layout_grub() {
   else
     echo 'layout=grub' > "$conf"
   fi
+
+  if [[ -f "$conf" ]] && grep -q '^initrd_generator=' "$conf"; then
+    sed -i 's/^initrd_generator=.*/initrd_generator=dracut/' "$conf"
+  else
+    printf 'initrd_generator=dracut\n' >> "$conf"
+  fi
+
+  if [[ -f "$conf" ]] && grep -q '^uki_generator=' "$conf"; then
+    sed -i 's/^uki_generator=.*/uki_generator=none/' "$conf"
+  else
+    printf 'uki_generator=none\n' >> "$conf"
+  fi
 }
 
 ensure_kernel_package() {
