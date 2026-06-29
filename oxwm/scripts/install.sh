@@ -128,8 +128,11 @@ ensure_x11_dependencies() {
         x11-libs/libXft \
         media-libs/fontconfig \
         media-libs/freetype \
+        x11-apps/xrandr \
         x11-misc/picom \
-        x11-apps/xrandr
+        x11-apps/xwallpaper \
+        media-gfx/flameshot \
+        media-gfx/feh
       ;;
     apt-get)
       log "Ensuring OxWM X11 dependencies via apt-get"
@@ -143,6 +146,9 @@ ensure_x11_dependencies() {
         libfontconfig1-dev \
         libfreetype6-dev \
         picom \
+        xwallpaper \
+        flameshot \
+        feh \
         x11-xserver-utils
       ;;
     dnf)
@@ -156,6 +162,9 @@ ensure_x11_dependencies() {
         fontconfig-devel \
         freetype-devel \
         picom \
+        xwallpaper \
+        flameshot \
+        feh \
         xrandr
       ;;
     pacman)
@@ -169,6 +178,9 @@ ensure_x11_dependencies() {
         fontconfig \
         freetype2 \
         picom \
+        xwallpaper \
+        flameshot \
+        feh \
         xorg-xrandr
       ;;
     zypper)
@@ -182,6 +194,9 @@ ensure_x11_dependencies() {
         fontconfig-devel \
         freetype2-devel \
         picom \
+        xwallpaper \
+        flameshot \
+        feh \
         xrandr
       ;;
     *)
