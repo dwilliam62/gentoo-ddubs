@@ -4,18 +4,18 @@
 set -e
 
 # Define paths based on your system configuration
-LOCAL_REPO="/var/db/repos/localrepo"
-ECLASS_DIR="${LOCAL_REPO}/eclass"
+GURU_REPO="/var/db/repos/guru"
+ECLASS_DIR="${GURU_REPO}/eclass"
 DUMMY_ECLASS="${ECLASS_DIR}/linux-mod.eclass"
 
 echo "=== Starting Gentoo GURU Mask & Fix Automation ==="
 
-# 1. Ensure the local repo eclass directory exists
+# 1. Ensure the guru repo eclass directory exists
 echo "-> Ensuring directory exists: ${ECLASS_DIR}"
 mkdir -p "${ECLASS_DIR}"
 
-# 2. Write the dummy eclass file
-echo "-> Creating dummy linux-mod.eclass to satisfy parsing..."
+# 2. Write the dummy eclass file directly into GURU
+echo "-> Creating dummy linux-mod.eclass inside GURU..."
 cat << 'EOF' > "${DUMMY_ECLASS}"
 # Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
@@ -38,7 +38,7 @@ if ! grep -q "games-util/hid-nintendo" /etc/portage/profile/package.mask 2>/dev/
 fi
 
 # 5. Regenerate Portage repository caches as root
-echo "-> Regenerating GURU cache matrix (this may take a moment)..."
+echo "-> Regenerating GURU cache matrix..."
 egencache --repo=guru --update
 
 echo "=== Success! You can now safely run your emerge commands ==="
