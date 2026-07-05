@@ -1,0 +1,43 @@
+# /etc/default/grub — GRUB configuration for Gentoo
+# This file is sourced by /etc/grub.d/00_header and /etc/grub.d/10_linux
+
+# GRUB boot menu timeout (in seconds)
+GRUB_TIMEOUT=10
+GRUB_TIMEOUT_STYLE=menu
+
+# Default boot entry (0 = first menuentry)
+GRUB_DEFAULT=0
+
+# Distributor name
+GRUB_DISTRIBUTOR="Gentoo"
+
+# Linux kernel command-line arguments (if needed)
+#GRUB_CMDLINE_LINUX=""
+#GRUB_CMDLINE_LINUX_DEFAULT=""
+
+# Graphics and theme
+GRUB_THEME="/boot/grub/themes/gentoo_glass/theme.txt"
+GRUB_GFXMODE=auto
+#GRUB_GFXPAYLOAD_LINUX=keep
+
+# Display options
+#GRUB_TERMINAL=console
+#GRUB_TERMINAL_OUTPUT=gfxterm
+
+# UUID handling
+#GRUB_DISABLE_LINUX_UUID=false
+GRUB_DISABLE_LINUX_PARTUUID=false
+
+# Recovery mode
+#GRUB_DISABLE_RECOVERY=true
+
+# Submenu handling
+#GRUB_DISABLE_SUBMENU=y
+
+# Diagnostic options (uncomment to enable)
+#GRUB_CMDLINE_LINUX="debug"
+
+# For btrfs systems with subvolumes, you may need to specify the root device explicitly.
+# Uncomment and adjust if GRUB paths are incorrect (e.g., showing /root/boot instead of /boot):
+# GRUB_DEVICE=/dev/sda3
+# GRUB_DEVICE_UUID=fadad7f6-0d7f-4066-9589-d701ee416ef5
