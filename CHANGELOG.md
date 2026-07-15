@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Jul 2026
+
+- Fixed: 
+  - `update.sh` building oxwm failed on unbound variable 
+
+- Added: 
+  - Script `quickshell-qtcompact.sh`
+
+
 ## Jun 2026
 
 - Updated: 

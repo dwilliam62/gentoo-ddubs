@@ -101,7 +101,7 @@ build_oxwm() {
     say "WARN: zig not found; skipping OXWM build."
     return 0
   fi
-  sudo -u "$build_user" env PATH="$PATH" ZIG_BIN="$zig_bin" bash -c "cd \"$OXWM_DIR\" && \"${ZIG_BIN}\" build -Doptimize=ReleaseFast"
+  sudo -u "$build_user" env PATH="$PATH" ZIG_BIN="$zig_bin" bash -c 'cd "$1" && "$ZIG_BIN" build -Doptimize=ReleaseFast' _ "$OXWM_DIR"
   if [ -f "${OXWM_DIR}/zig-out/bin/oxwm" ]; then
     install -Dm755 "${OXWM_DIR}/zig-out/bin/oxwm" /usr/local/bin/oxwm
     say "Installed /usr/local/bin/oxwm"
