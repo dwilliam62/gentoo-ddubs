@@ -52,7 +52,11 @@ set_vm_resolution() {
 }
 
 set_vm_resolution
+if command -v gentoo-pipewire-launcher >/dev/null 2>&1; then
+  gentoo-pipewire-launcher &
+fi
+
 if command -v variety >/dev/null 2>&1; then
   variety >/dev/null 2>&1 &
 fi
-exec oxwm
+exec dbus-launch --exit-with-session oxwm

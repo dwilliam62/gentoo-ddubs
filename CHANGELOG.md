@@ -2,48 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## Aug 2026
+
+- Added `install-contour` script
+- Added `install-fuse` script
+- Added `install-hyprmod` script
+- Fixed `oxwm` build errors
+
 ## Jul 2026
 
-- Fixed: 
-  - `update.sh` building oxwm failed on unbound variable 
+- Fixed:
+  - `update.sh` building oxwm failed on unbound variable
 
-- Added: 
+- Added:
   - Script `quickshell-qtcompact.sh`
-
 
 ## Jun 2026
 
-- Updated: 
-  - `gentoo-install-hyprland` script 
+- Updated:
+  - `gentoo-install-hyprland` script
     - Chaned default from `efibootmgr` to `grub`
-  - `yazi` build script to install current yazi bld 
+  - `yazi` build script to install current yazi bld
 - Added:
-   - Script to migrate `efibootmgr` to grub with current kernel 
-   - `oxwm` install script 
-      - Removed `oxwm` install from hyprland install
-   - `clone-gentoo.sh` script 
-   - installs my config on blank systems 
-   - `ly` login mgr 
-   - `nwg-display`
-   - `variety` 
-   - `docutils`
-   - `pycairo`
-   - `pygobject`
-   - `waypaper`
-   - python target fix to `make.conf`
-   - `PYTHON_TARGETS="python3_13 python3_14"`
-   - `PYTHON_SINGLE_TARGET="python3_14"`
-- Added python overrides for: 
-   - `nwg-display`
-   - `variety` 
-   - `docutils`
-   - `pycairo`
-   - `pygobject`
-   - `waypaper`
+  - Script to migrate `efibootmgr` to grub with current kernel
+  - `oxwm` install script
+    - Removed `oxwm` install from hyprland install
+  - `clone-gentoo.sh` script
+  - installs my config on blank systems
+  - `ly` login mgr
+  - `nwg-display`
+  - `variety`
+  - `docutils`
+  - `pycairo`
+  - `pygobject`
+  - `waypaper`
+  - python target fix to `make.conf`
+  - `PYTHON_TARGETS="python3_13 python3_14"`
+  - `PYTHON_SINGLE_TARGET="python3_14"`
+- Added python overrides for:
+  - `nwg-display`
+  - `variety`
+  - `docutils`
+  - `pycairo`
+  - `pygobject`
+  - `waypaper`
 - Added python target fix to `make.conf`
-   - `PYTHON_TARGETS="python3_13 python3_14"`
-   - `PYTHON_SINGLE_TARGET="python3_14"`
-=======
+  - `PYTHON_TARGETS="python3_13 python3_14"`
+  - # `PYTHON_SINGLE_TARGET="python3_14"`
 - Added gentoo installer
   - From `https://github.com/oddlama/gentoo-install`
   - I had to patch it to get it to install
@@ -58,7 +63,7 @@ All notable changes to this project will be documented in this file.
 - Added python target fix to `make.conf`
   - `PYTHON_TARGETS="python3_13 python3_14"`
   - `PYTHON_SINGLE_TARGET="python3_14"`
->>>>>>> fa38ee9d (Added tui-installer from GH oddlama/gentoo-install)
+    > > > > > > > fa38ee9d (Added tui-installer from GH oddlama/gentoo-install)
 
 ## May 2026
 

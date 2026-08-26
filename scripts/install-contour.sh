@@ -38,18 +38,26 @@ cat << 'EOF' > /etc/portage/package.mask/libunicode
 >=media-libs/libunicode-0.8.0
 EOF
 
-echo "[*] Step 5: Enabling 'qml' USE flag on dev-qt/qtmultimedia (fixes Contour runtime crash)..."
+echo "[*] Step 5: Configuring USE flags for Qt and Contour dependencies..."
 mkdir -p /etc/portage/package.use
-cat << 'EOF' > /etc/portage/package.use/qtmultimedia
-# Required by Contour QML UI (Terminal.qml)
-dev-qt/qtmultimedia qml
+cat << 'EOF' > /etc/portage/package.use/contour
+# Required by Contour QML UI (Terminal.qml) and Qt6 Wayland/OpenGL/Vulkan stack
+dev-qt/qtbase opengl vulkan
+dev-qt/qtdeclarative opengl vulkan
+dev-qt/qtmultimedia qml opengl vulkan
+dev-qt/qtquick3d opengl vulkan
+sys-libs/zlib minizip
 EOF
 
-echo "[*] Step 6: Updating dev-qt/qtmultimedia with new USE flag..."
-emerge --changed-use --noreplace dev-qt/qtmultimedia
+echo "[*] Step 6: Updating Qt dependencies with new USE flags..."
+emerge --changed-use --noreplace dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia dev-qt/qtquick3d
 
 echo "[*] Step 7: Emerging gui-apps/contour..."
-emerge -av gui-apps/contour
+if [[ -t 0 ]]; then
+    emerge -av gui-apps/contour
+else
+    emerge -v gui-apps/contour
+fi
 
 echo "[+] Installation complete! You can now launch Contour with: contour"
 
