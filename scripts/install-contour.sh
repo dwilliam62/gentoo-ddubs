@@ -46,11 +46,12 @@ dev-qt/qtbase opengl vulkan
 dev-qt/qtdeclarative opengl vulkan
 dev-qt/qtmultimedia qml opengl vulkan
 dev-qt/qtquick3d opengl vulkan
+dev-qt/qt5compat qml
 sys-libs/zlib minizip
 EOF
 
 echo "[*] Step 6: Updating Qt dependencies with new USE flags..."
-emerge --changed-use --noreplace dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia dev-qt/qtquick3d
+emerge --changed-use --noreplace dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia dev-qt/qtquick3d dev-qt/qt5compat
 
 echo "[*] Step 7: Emerging gui-apps/contour..."
 if [[ -t 0 ]]; then
