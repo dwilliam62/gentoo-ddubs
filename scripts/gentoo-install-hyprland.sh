@@ -447,6 +447,13 @@ gtk-application-prefer-dark-theme=1
 gtk-icon-theme-name=Adwaita
 EOF
   cp "${HOME}/.config/gtk-3.0/settings.ini" "${HOME}/.config/gtk-4.0/settings.ini"
+
+  # Also set GNOME interface preferences so xdg-desktop-portal Settings reports dark mode
+  # to Flatpak/libadwaita apps (e.g., Gear Lever).
+  if command -v gsettings >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' >/dev/null 2>&1 || true
+    gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' >/dev/null 2>&1 || true
+  fi
 }
 
 ensure_gentoo_rsync_repo() {
@@ -910,6 +917,8 @@ HYPR_PACKAGES=(
   gui-apps/wl-clipboard
   gui-apps/waypaper
   gui-libs/hyprcursor::hyproverlay
+  gui-libs/xdg-desktop-portal
+  gui-libs/xdg-desktop-portal-gtk
   gui-libs/xdg-desktop-portal-hyprland::hyproverlay
   gui-libs/hyprutils
   gui-libs/hyprland-qt-support
