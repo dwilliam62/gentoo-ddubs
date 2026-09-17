@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Sep 2026
+
+- Added scripts/set-glaze-7-hl.sh 
+    - Hyprland doesn't support glaze v8.0 
+    - Script masks glaze and will optionally reubild Hyprland
+
+
 ## Aug 2026
 
 - Added `install-contour` script
