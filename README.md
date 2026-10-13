@@ -16,6 +16,7 @@
 > Mostly Jak's Hyprland [dotfiles](https://github.com/Jakoolit/Hyprland-Dots)
 
 - The `gentoo-install-project-overview.md` has more info on this project
+- `gentoo-waybar-issue.md` covers Waybar aborting on reload (SIGUSR2) and the fix script for it
 - It does attempt to detect GPU hardware.
   - To date it's only tested in Proxmox VMs.
 

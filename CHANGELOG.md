@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Oct 2026
+
+- Added `scripts/fix-waybar-reload-crash.sh`
+  - Waybar aborts on reload when a second bar is running
+  - `pkill -SIGUSR2` is what the KooL dots send on lid, monitor and wallpaper events
+  - Installs a Portage user patch giving each Waybar process its own D-Bus app id, then rebuilds
+  - `--check` reports status, `--test` reproduces and verifies the crash, `--remove` backs it out
+- Added `gentoo-waybar-issue.md`
+  - Symptom, cause, evidence and maintenance notes for the above
+
 ## Sep 2026
 
 - Added scripts/set-glaze-7-hl.sh 

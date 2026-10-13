@@ -18,6 +18,7 @@ Snapshot of a configured Gentoo VM plus user dotfiles and scripts to quickly rep
   - update.sh: update helper (supports --skip-quickshell)
   - post-install-cleanup.sh: optional cleanup of tarballs/etc
   - after-kernel-update.sh: regenerate GRUB and prune old kernels
+  - fix-waybar-reload-crash.sh: Waybar aborts on SIGUSR2 reload when a second bar is running; installs a Portage user patch and rebuilds (see gentoo-waybar-issue.md)
 
 ### deploy-dotfiles.sh behavior (big picture)
 - Backs up any replaced files into ~/.local/share/dotfiles-backup/<timestamp>
