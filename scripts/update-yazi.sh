@@ -3,6 +3,9 @@ set -euo pipefail
 
 YAZI_ATOM="=app-misc/yazi-9999::guru"
 KEYWORD_ENTRY="=app-misc/yazi-9999::guru **"
+# guru's yazi ebuilds depend on >=dev-libs/jemalloc-5.3.1:=, which only
+# exists as ~amd64, so both keyword fixes are applied and removed together.
+JEMALLOC_KEYWORD_ENTRY="dev-libs/jemalloc ~amd64"
 KEYWORDS_PATH="/etc/portage/package.accept_keywords"
 GURU_REPO_CONF="/etc/portage/repos.conf/guru.conf"
 GURU_SYNC_URI="https://gitweb.gentoo.org/repo/proj/guru.git"
@@ -68,9 +71,10 @@ Usage:
   bash scripts/update-yazi.sh [--install|-i] [--status|-s] [--remove|-r] [--help|-h]
 
 Options:
-  --install, -i  Install/update yazi-9999 from guru and apply keyword fix.
+  --install, -i  Install/update yazi-9999 from guru and apply keyword fixes
+                 (yazi-9999 and dev-libs/jemalloc).
   --status, -s   Show Yazi install status, current version, and keyword-fix status.
-  --remove, -r   Remove app-misc/yazi and remove the yazi-9999 keyword fix.
+  --remove, -r   Remove app-misc/yazi and remove the keyword fixes.
   --help, -h     Show this help text.
 
 Default behavior:
@@ -78,26 +82,36 @@ Default behavior:
 EOF
 }
 
+YAZI_KEYWORD_PATTERN='(^|[[:space:]])=?app-misc/yazi-9999([[:space:]]|$)'
+JEMALLOC_KEYWORD_PATTERN='(^|[[:space:]])=?dev-libs/jemalloc([[:space:]]|$)'
+
+# Target file for a package's keyword entry. Inside a directory, each package
+# gets its own file; a plain file holds every entry.
 keyword_target_file() {
+  local name="${1:-yazi}"
+
   if [ -d "$KEYWORDS_PATH" ]; then
-    printf "%s\n" "$KEYWORDS_PATH/yazi"
+    printf "%s\n" "$KEYWORDS_PATH/$name"
   else
     printf "%s\n" "$KEYWORDS_PATH"
   fi
 }
 
 keyword_fix_present_exact() {
+  local entry="$1"
+
   if [ -d "$KEYWORDS_PATH" ]; then
-    grep -R -F -x -- "$KEYWORD_ENTRY" "$KEYWORDS_PATH" >/dev/null 2>&1
+    grep -R -F -x -- "$entry" "$KEYWORDS_PATH" >/dev/null 2>&1
   elif [ -f "$KEYWORDS_PATH" ]; then
-    grep -F -x -- "$KEYWORD_ENTRY" "$KEYWORDS_PATH" >/dev/null 2>&1
+    grep -F -x -- "$entry" "$KEYWORDS_PATH" >/dev/null 2>&1
   else
     return 1
   fi
 }
 
 keyword_fix_present_any() {
-  local pattern='(^|[[:space:]])=?app-misc/yazi-9999([[:space:]]|$)'
+  local pattern="$1"
+
   if [ -d "$KEYWORDS_PATH" ]; then
     grep -R -E -- "$pattern" "$KEYWORDS_PATH" >/dev/null 2>&1
   elif [ -f "$KEYWORDS_PATH" ]; then
@@ -108,8 +122,8 @@ keyword_fix_present_any() {
 }
 
 ensure_keyword_fix() {
-  local target
-  target="$(keyword_target_file)"
+  local entry="$1"
+  local target="$2"
 
   if [ -d "$KEYWORDS_PATH" ]; then
     install -d "$KEYWORDS_PATH"
@@ -118,33 +132,34 @@ ensure_keyword_fix() {
   fi
   touch "$target"
 
-  if grep -F -x -- "$KEYWORD_ENTRY" "$target" >/dev/null 2>&1; then
+  if grep -F -x -- "$entry" "$target" >/dev/null 2>&1; then
     say "Keyword fix already present in $target"
     return 0
   fi
 
-  printf "%s\n" "$KEYWORD_ENTRY" >> "$target"
+  printf "%s\n" "$entry" >> "$target"
   say "Added keyword fix to $target"
 }
 
 remove_keyword_fix() {
+  local entry="$1"
   local removed="false"
   local file tmp
 
   if [ -d "$KEYWORDS_PATH" ]; then
     while IFS= read -r -d '' file; do
-      if grep -F -x -- "$KEYWORD_ENTRY" "$file" >/dev/null 2>&1; then
+      if grep -F -x -- "$entry" "$file" >/dev/null 2>&1; then
         tmp="$(mktemp)"
-        grep -F -x -v -- "$KEYWORD_ENTRY" "$file" > "$tmp" || true
+        grep -F -x -v -- "$entry" "$file" > "$tmp" || true
         cat "$tmp" > "$file"
         rm -f "$tmp"
         removed="true"
         say "Removed keyword fix from $file"
       fi
     done < <(find "$KEYWORDS_PATH" -type f -print0)
-  elif [ -f "$KEYWORDS_PATH" ] && grep -F -x -- "$KEYWORD_ENTRY" "$KEYWORDS_PATH" >/dev/null 2>&1; then
+  elif [ -f "$KEYWORDS_PATH" ] && grep -F -x -- "$entry" "$KEYWORDS_PATH" >/dev/null 2>&1; then
     tmp="$(mktemp)"
-    grep -F -x -v -- "$KEYWORD_ENTRY" "$KEYWORDS_PATH" > "$tmp" || true
+    grep -F -x -v -- "$entry" "$KEYWORDS_PATH" > "$tmp" || true
     cat "$tmp" > "$KEYWORDS_PATH"
     rm -f "$tmp"
     removed="true"
@@ -154,6 +169,21 @@ remove_keyword_fix() {
   if [ "$removed" = "false" ]; then
     say "Keyword fix not found; nothing to remove."
   fi
+}
+
+yazi_keyword_fix_present_exact() { keyword_fix_present_exact "$KEYWORD_ENTRY"; }
+yazi_keyword_fix_present_any() { keyword_fix_present_any "$YAZI_KEYWORD_PATTERN"; }
+jemalloc_keyword_fix_present_exact() { keyword_fix_present_exact "$JEMALLOC_KEYWORD_ENTRY"; }
+jemalloc_keyword_fix_present_any() { keyword_fix_present_any "$JEMALLOC_KEYWORD_PATTERN"; }
+
+ensure_keyword_fixes() {
+  ensure_keyword_fix "$KEYWORD_ENTRY" "$(keyword_target_file yazi)"
+  ensure_keyword_fix "$JEMALLOC_KEYWORD_ENTRY" "$(keyword_target_file jemalloc)"
+}
+
+remove_keyword_fixes() {
+  remove_keyword_fix "$KEYWORD_ENTRY"
+  remove_keyword_fix "$JEMALLOC_KEYWORD_ENTRY"
 }
 
 installed_pkg_cpv() {
@@ -198,12 +228,20 @@ status_yazi() {
     printf "  rustc: unavailable (%s)\n" "$rustc_live_state"
   fi
 
-  if keyword_fix_present_exact; then
+  if yazi_keyword_fix_present_exact; then
     printf "  yazi-9999 keyword fix (%s): installed\n" "$KEYWORD_ENTRY"
-  elif keyword_fix_present_any; then
+  elif yazi_keyword_fix_present_any; then
     printf "  yazi-9999 keyword fix: custom entry found (not exact match)\n"
   else
     printf "  yazi-9999 keyword fix (%s): missing\n" "$KEYWORD_ENTRY"
+  fi
+
+  if jemalloc_keyword_fix_present_exact; then
+    printf "  jemalloc keyword fix (%s): installed\n" "$JEMALLOC_KEYWORD_ENTRY"
+  elif jemalloc_keyword_fix_present_any; then
+    printf "  jemalloc keyword fix: custom entry found (not exact match)\n"
+  else
+    printf "  jemalloc keyword fix (%s): missing\n" "$JEMALLOC_KEYWORD_ENTRY"
   fi
 }
 
@@ -254,7 +292,7 @@ install_yazi() {
 
   rustc_ver="$(current_rustc_version || true)"
   ensure_guru_repo
-  ensure_keyword_fix
+  ensure_keyword_fixes
   say "rustc ${rustc_ver} satisfies live yazi requirement (>= ${MIN_RUSTC_VERSION_LIVE})."
   say "Installing/updating $YAZI_ATOM ..."
   emerge --oneshot "$YAZI_ATOM"
@@ -269,7 +307,7 @@ remove_yazi() {
   else
     say "app-misc/yazi is not installed."
   fi
-  remove_keyword_fix
+  remove_keyword_fixes
   say "Remove action completed."
 }
 
