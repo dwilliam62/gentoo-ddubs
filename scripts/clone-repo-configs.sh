@@ -14,14 +14,14 @@ INCLUDE_FSTAB="false"
 VIDEO_CARDS_OVERRIDE=""
 LY_ONLY="false"
 
-say() {
-  printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
-}
-
-fail() {
-  printf '[ERROR] %s\n' "$*" >&2
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
   exit 1
 }
+
+fail() { die "$*"; }
 
 print_usage() {
   cat <<'EOF'
@@ -47,12 +47,6 @@ Behavior:
   --ly-only forces ly setup without running the full config clone flow.
   --include-system-files does NOT overwrite /etc/fstab unless --include-fstab is set.
 EOF
-}
-
-need_root() {
-  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    exec sudo -E bash "$0" "$@"
-  fi
 }
 
 run_cmd() {
@@ -123,16 +117,19 @@ detect_video_cards() {
 
   local detected=()
   if command -v lspci >/dev/null 2>&1; then
-    if lspci | grep -qiE 'virtio|qxl|vmware'; then
+    # One lspci run, reused for every probe.
+    local lspci_out
+    lspci_out="$(lspci 2>/dev/null || true)"
+    if printf '%s\n' "$lspci_out" | grep -qiE 'virtio|qxl|vmware'; then
       detected+=("virgl")
     fi
-    if lspci | grep -qi 'nvidia'; then
+    if printf '%s\n' "$lspci_out" | grep -qi 'nvidia'; then
       detected+=("nvidia")
     fi
-    if lspci | grep -qiE 'amd|ati'; then
+    if printf '%s\n' "$lspci_out" | grep -qiE 'amd|ati'; then
       detected+=("amdgpu" "radeonsi")
     fi
-    if lspci | grep -qi 'intel'; then
+    if printf '%s\n' "$lspci_out" | grep -qi 'intel'; then
       detected+=("intel" "i915")
     fi
   fi

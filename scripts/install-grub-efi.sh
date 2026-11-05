@@ -11,20 +11,27 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+	printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+	exit 1
+}
+
 msg() {
 	printf '%s\n' "$1"
 }
 
 error() {
-	printf '\033[0;31mERROR:\033[0m %s\n' "$1" >&2
+	log_err "$1"
 }
 
 success() {
-	printf '\033[0;32m✓\033[0m %s\n' "$1"
+	log_ok "$1"
 }
 
 warn() {
-	printf '\033[1;33m⚠\033[0m %s\n' "$1"
+	log_warn "$1"
 }
 
 show_usage() {
@@ -57,10 +64,7 @@ EOF
 }
 
 check_root() {
-	if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-		error "must be run as root"
-		exit 1
-	fi
+	require_root
 }
 
 verify_efi_system() {
@@ -140,8 +144,9 @@ install_grub_efi() {
 	msg ""
 	msg "Detecting boot device and partition..."
 
-	local boot_device efi_partition
-	boot_device=$(df /boot/efi | tail -1 | awk '{print $1}')
+	local boot_device
+	# df can wrap long device names; -P forces one line per filesystem.
+	boot_device=$(df -P /boot/efi | awk 'NR==2 {print $1}')
 
 	if [[ -z "$boot_device" ]]; then
 		error "Could not determine boot device"
@@ -150,8 +155,10 @@ install_grub_efi() {
 
 	msg "Boot device: $boot_device"
 
-	# Extract base device (remove partition number)
-	local base_device="${boot_device%[0-9]*}"
+	# Extract the base device: strip the trailing partition number while keeping
+	# NVMe/mmcblk style names intact (/dev/nvme0n1p2 -> /dev/nvme0n1).
+	local base_device
+	base_device="$(printf '%s\n' "$boot_device" | sed -E 's/p?[0-9]+$//')"
 	msg "Base device: $base_device"
 
 	if [[ ! -b "$base_device" ]]; then
@@ -163,7 +170,17 @@ install_grub_efi() {
 	msg "Installing GRUB to $base_device..."
 	msg "This will install GRUB to the EFI System Partition"
 
-	if grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=gentoo --recheck; then
+	local grub_target
+	case "$(uname -m)" in
+		x86_64) grub_target="x86_64-efi" ;;
+		aarch64|arm64) grub_target="arm64-efi" ;;
+		*)
+			error "Unsupported architecture for GRUB EFI: $(uname -m)"
+			return 1
+			;;
+	esac
+
+	if grub-install --target="$grub_target" --efi-directory=/boot/efi --bootloader-id=gentoo --recheck; then
 		success "GRUB installed successfully"
 	else
 		error "GRUB installation failed"
@@ -250,7 +267,7 @@ main() {
 		msg "  1. Review the changes above"
 		msg "  2. Reboot the system: sudo reboot"
 		msg "  3. You should see the GRUB menu on boot"
-		msg "  4. Select the 7.1.3 kernel to test"
+		msg "  4. Select the newest kernel to test"
 		msg ""
 		msg "If you don't see GRUB menu:"
 		msg "  - Press ESC/SPACE during boot to access GRUB menu"

@@ -6,15 +6,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 DDUBS_ROOT="$(realpath "${SCRIPT_DIR}/../gentoo-ddubs")"
 
-require_cmd() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "[$1] is required but not found. Exiting." >&2
-    exit 1
-  fi
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
 }
 
-require_cmd sudo
-require_cmd emerge
+require_cmd sudo emerge
 
 if ! command -v equery >/dev/null 2>&1; then
   echo "[INFO] Installing app-portage/gentoolkit for equery..."

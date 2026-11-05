@@ -6,6 +6,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 # Repo root (one level above scripts/)
 DDUBS_ROOT="$(realpath "${SCRIPT_DIR}/..")"
+# Under `sudo bash script.sh` $USER is root while the desktop session belongs to
+# the invoking user, so resolve the real target user once here.
+TARGET_USER="${SUDO_USER:-${USER:-$(id -un)}}"
+
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
+
 HYPROVERLAY_REPO_CONF="/etc/portage/repos.conf/hyproverlay.conf"
 HYPROVERLAY_SYNC_URI="https://codeberg.org/hyproverlay/hyproverlay.git"
 
@@ -68,7 +79,9 @@ ensure_nix_with_flakes() {
     fi
 
     echo "[INFO] Installing Nix (daemon) ..."
-    if curl -fsSL "$url" | sudo sh -s -- $flags; then
+    local -a install_flags
+    read -r -a install_flags <<< "${flags}"
+    if curl -fsSL "$url" | sudo sh -s -- "${install_flags[@]}"; then
       echo "[INFO] Nix installed. Enabling flakes..."
       sudo mkdir -p /etc/nix
       if ! sudo grep -q "^extra-experimental-features" "$nix_conf" 2>/dev/null; then
@@ -244,12 +257,6 @@ ensure_video_cards() {
   echo "[OK] VIDEO_CARDS set to: $cards"
 }
 
-pkg_installed() {
-  # Use qlist -I (from app-portage/portage-utils) for fast membership checks
-  # Expects a full category/atom like gui-wm/hyprland.
-  qlist -I "$1" >/dev/null 2>&1
-}
-
 # Generic helper: install a package only if it is not already installed.
 # Uses the same pkg_installed() check as install_pkg, but keeps the call-site
 # simple and avoids re-emerging things on script re-runs when they are
@@ -405,31 +412,31 @@ configure_ly() {
 configure_pipewire() {
   echo "[INFO] Enabling PipeWire + WirePlumber (systemd user units)"
 
-  # Ensure current user is in required audio/video/pipewire groups
+  # Ensure the target user is in required audio/video/pipewire groups
   local grp
   for grp in audio video pipewire; do
-    if id -nG "${USER}" | grep -qw "$grp"; then
-      echo "[OK] User ${USER} already in group $grp"
+    if id -nG "${TARGET_USER}" | grep -qw "$grp"; then
+      echo "[OK] User ${TARGET_USER} already in group $grp"
     else
-      if sudo gpasswd -a "${USER}" "$grp"; then
-        echo "[INFO] Added ${USER} to group $grp"
+      if sudo gpasswd -a "${TARGET_USER}" "$grp"; then
+        echo "[INFO] Added ${TARGET_USER} to group $grp"
       else
-        echo "[WARN] Failed to add ${USER} to group $grp (group may not exist?)"
+        echo "[WARN] Failed to add ${TARGET_USER} to group $grp (group may not exist?)"
       fi
     fi
   done
 
   if command -v loginctl >/dev/null 2>&1; then
-    echo "[INFO] Enabling systemd user lingering for ${USER} (for user services at boot)"
-    sudo loginctl enable-linger "${USER}" ||
-      echo "[WARN] Failed to enable linger for ${USER}; PipeWire user services will start only after login."
+    echo "[INFO] Enabling systemd user lingering for ${TARGET_USER} (for user services at boot)"
+    sudo loginctl enable-linger "${TARGET_USER}" ||
+      echo "[WARN] Failed to enable linger for ${TARGET_USER}; PipeWire user services will start only after login."
   fi
 
   if command -v systemctl >/dev/null 2>&1; then
-    echo "[INFO] Enabling PipeWire user units for ${USER}"
+    echo "[INFO] Enabling PipeWire user units for ${TARGET_USER}"
     if ! systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service; then
       echo "[WARN] Could not enable PipeWire user units (no user systemd session yet?)."
-      echo "[WARN] After first login, run manually as ${USER}:"
+      echo "[WARN] After first login, run manually as ${TARGET_USER}:"
       echo "       systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service"
     fi
   else
@@ -861,7 +868,7 @@ configure_shell_runtime_exports() {
 }
 
 configure_flatpak_flathub() {
-  echo "[INFO] Ensuring Flathub (stable) Flatpak remote is configured for user ${USER}"
+  echo "[INFO] Ensuring Flathub (stable) Flatpak remote is configured for user ${TARGET_USER}"
 
   if ! command -v flatpak >/dev/null 2>&1; then
     echo "[WARN] flatpak command not found; skipping Flatpak remote configuration."
@@ -870,7 +877,7 @@ configure_flatpak_flathub() {
 
   # Only configure the main Flathub repo (no beta/testing remotes)
   if flatpak --user remote-list 2>/dev/null | awk '{print $1}' | grep -qx "flathub"; then
-    echo "[OK] Flathub Flatpak remote already present for user ${USER}"
+    echo "[OK] Flathub Flatpak remote already present for user ${TARGET_USER}"
   else
     if flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo; then
       echo "[OK] Added Flathub Flatpak remote (user scope)."

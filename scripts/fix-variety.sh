@@ -19,42 +19,21 @@ set -euo pipefail
 #   - Optional warnings may still appear (e.g. Variety Slideshow not installed,
 #     libayatana deprecation warnings). Those were non-fatal.
 
-log() {
-  printf '[fix-variety] %s\n' "$*"
-}
-
-warn() {
-  printf '[fix-variety] WARN: %s\n' "$*" >&2
-}
-
-die() {
-  printf '[fix-variety] ERROR: %s\n' "$*" >&2
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
   exit 1
 }
 
-need_root() {
-  if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
-    return
-  fi
-  if command -v sudo >/dev/null 2>&1; then
-    exec sudo -E bash "$0" "$@"
-  fi
-  die "must run as root (or with sudo available)"
+log() { log_info "[fix-variety] $*"; }
+warn() { log_warn "[fix-variety] WARN: $*"; }
+die() {
+  log_err "[fix-variety] ERROR: $*"
+  exit 1
 }
 
-require_cmds() {
-  local missing=()
-  local c
-  for c in emerge gdk-pixbuf-query-loaders; do
-    if ! command -v "$c" >/dev/null 2>&1; then
-      missing+=("$c")
-    fi
-  done
-
-  if (( ${#missing[@]} > 0 )); then
-    die "required commands not found: ${missing[*]}"
-  fi
-}
+require_cmds() { require_cmd emerge gdk-pixbuf-query-loaders; }
 
 detect_pixbuf_paths() {
   LOADER_DIR="$(pkg-config --variable=gdk_pixbuf_moduledir gdk-pixbuf-2.0 2>/dev/null || true)"
@@ -144,10 +123,12 @@ main() {
   print_loader_diag
 
   log "Reinstalling core GTK pixbuf/SVG packages..."
-  emerge -1v x11-libs/gdk-pixbuf gnome-base/librsvg
+  emerge -1v x11-libs/gdk-pixbuf gnome-base/librsvg ||
+    die "failed to reinstall x11-libs/gdk-pixbuf / gnome-base/librsvg"
 
   log "Installing WebP and AVIF pixbuf support..."
-  USE="gdk-pixbuf" emerge -1v gui-libs/gdk-pixbuf-loader-webp media-libs/libavif
+  USE="gdk-pixbuf" emerge -1v gui-libs/gdk-pixbuf-loader-webp media-libs/libavif ||
+    die "failed to install the WebP/AVIF pixbuf loaders"
 
   refresh_caches
 

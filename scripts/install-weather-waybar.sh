@@ -13,11 +13,21 @@ REPO_URL="https://github.com/wneessen/waybar-weather.git"
 APP_NAME="waybar-weather"
 INSTALL_PATH="/usr/bin/${APP_NAME}"
 
-log() { echo "[${APP_NAME}] $*"; }
-warn() { echo "[${APP_NAME}] WARN: $*" >&2; }
-die() { echo "[${APP_NAME}] ERROR: $*" >&2; exit 1; }
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
 
-need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
+log() { log_info "[${APP_NAME}] $*"; }
+warn() { log_warn "[${APP_NAME}] WARN: $*"; }
+die() {
+  log_err "[${APP_NAME}] ERROR: $*"
+  exit 1
+}
+
+need_cmd() { require_cmd "$1"; }
 
 require_root_or_sudo() {
   if [[ $EUID -eq 0 ]]; then
@@ -83,19 +93,30 @@ main() {
   trap 'rm -rf "${tmp}"' EXIT
 
   log "Cloning ${REPO_URL}"
-  git clone --depth 1 "${REPO_URL}" "${tmp}/${APP_NAME}" >/dev/null 2>&1 || die "git clone failed"
+  git clone --depth 1 --single-branch "${REPO_URL}" "${tmp}/${APP_NAME}" >/dev/null 2>&1 ||
+    die "git clone failed"
 
-  cd "${tmp}/${APP_NAME}"
+  cd "${tmp}/${APP_NAME}" || die "cannot enter ${tmp}/${APP_NAME}"
 
   log "Downloading and verifying Go modules"
   go mod download >/dev/null 2>&1 || die "go mod download failed"
   go mod verify >/dev/null 2>&1 || die "go mod verify failed"
 
   log "Building ${APP_NAME}"
-  GOFLAGS="${GOFLAGS:-}" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "${APP_NAME}" ./cmd/${APP_NAME} || die "go build failed"
+  GOFLAGS="${GOFLAGS:-}" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
+    -o "${APP_NAME}" "./cmd/${APP_NAME}" || die "go build failed"
+
+  # Refuse to install an empty or non-executable artifact.
+  if [ ! -s "${APP_NAME}" ] || [ ! -x "${APP_NAME}" ]; then
+    die "build produced no usable binary (${APP_NAME})"
+  fi
 
   log "Installing to ${INSTALL_PATH}"
   ${SUDO} install -D -m 0755 "${APP_NAME}" "${INSTALL_PATH}" || die "install failed"
+
+  if [ ! -x "${INSTALL_PATH}" ]; then
+    die "${INSTALL_PATH} is not executable after installation"
+  fi
 
   if "${INSTALL_PATH}" -h >/dev/null 2>&1; then
     log "Installed ${APP_NAME} to ${INSTALL_PATH}"

@@ -11,20 +11,27 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+	printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+	exit 1
+}
+
 msg() {
 	printf '%s\n' "$1"
 }
 
 error() {
-	printf 'ERROR: %s\n' "$1" >&2
+	log_err "$1"
 }
 
 success() {
-	printf '\033[0;32m✓\033[0m %s\n' "$1"
+	log_ok "$1"
 }
 
 warn() {
-	printf '\033[1;33m⚠\033[0m %s\n' "$1"
+	log_warn "$1"
 }
 
 show_usage() {
@@ -57,7 +64,6 @@ EOF
 
 HOST=""
 DEPLOY_CONFIG=0
-REGEN=0
 ACTION="check"
 
 while [[ $# -gt 0 ]]; do
@@ -71,7 +77,6 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--regen)
-			REGEN=1
 			ACTION="regen"
 			shift
 			;;
@@ -146,7 +151,13 @@ check_grub_config() {
 }
 
 deploy_grub_config() {
-	local config_file="./etc/default/grub"
+	# Resolve the config against the repo, not the caller's cwd.
+	local script_dir config_file
+	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	config_file="${GRUB_CONFIG_FILE:-${script_dir}/../etc/default/grub}"
+	if [[ ! -f "$config_file" ]]; then
+		config_file="${script_dir}/../system/etc/default/grub"
+	fi
 
 	if [[ ! -f "$config_file" ]]; then
 		error "Config file not found: $config_file"

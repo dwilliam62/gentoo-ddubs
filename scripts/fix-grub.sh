@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
+
 SCRIPT_NAME="$(basename "$0")"
 GRUB_CFG="/boot/grub/grub.cfg"
 LOG_FILE="/var/log/fix-grub.log"
@@ -79,7 +86,6 @@ EOF
 }
 
 BACKUP=1
-DO_REGEN=1
 DO_CHECK=0
 DO_INFO=0
 DO_TRIM=0
@@ -93,26 +99,21 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --check)
       DO_CHECK=1
-      DO_REGEN=0
       ;;
     --info)
       DO_INFO=1
-      DO_REGEN=0
       ;;
     --trim)
       DO_TRIM=1
-      DO_REGEN=0
       ;;
     --set-default)
       DO_SET_DEFAULT=1
-      DO_REGEN=0
       shift
       [[ $# -gt 0 ]] || die "--set-default requires a value"
       SET_DEFAULT_VAL="$1"
       ;;
     --env)
       DO_ENV=1
-      DO_REGEN=0
       ;;
     --yes)
       ASSUME_YES=1
@@ -271,19 +272,17 @@ grub_entries_raw() {
 set_grub_default() {
   ensure_privileges
   local val="$1"
-  local idx="" title="" kernel="" initrd="" match_count=0
+  local idx="" title="" match_count=0
   local entries
   entries="$(grub_entries_raw)"
 
   if [[ "$val" =~ ^[0-9]+$ ]]; then
     idx="$val"
   else
-    while IFS='|' read -r e_idx e_title e_kernel e_initrd; do
+    while IFS='|' read -r e_idx e_title e_kernel _; do
       if [[ "$e_title" == "$val" ]]; then
         idx="$e_idx"
         title="$e_title"
-        kernel="$e_kernel"
-        initrd="$e_initrd"
         match_count=$((match_count + 1))
       elif [[ -n "$e_kernel" ]]; then
         local v
@@ -291,8 +290,6 @@ set_grub_default() {
         if [[ "$v" == "$val" ]]; then
           idx="$e_idx"
           title="$e_title"
-          kernel="$e_kernel"
-          initrd="$e_initrd"
           match_count=$((match_count + 1))
         fi
       fi
@@ -327,7 +324,8 @@ regen_grub() {
   ensure_privileges
   log "INFO" "Regenerating GRUB config."
   if [[ "$BACKUP" -eq 1 && -f "$GRUB_CFG" ]]; then
-    local bak="$GRUB_CFG.bak-$(date '+%Y%m%d%H%M%S')"
+    local bak
+    bak="$GRUB_CFG.bak-$(date '+%Y%m%d%H%M%S')"
     log "INFO" "Backing up $GRUB_CFG to $bak"
     $SUDO cp -a "$GRUB_CFG" "$bak"
   fi
@@ -353,7 +351,7 @@ trim_kernels() {
 
   remove=()
   while IFS= read -r v; do
-    if [[ ! " ${keep[*]} " =~ " ${v} " ]]; then
+    if [[ " ${keep[*]} " != *" ${v} "* ]]; then
       remove+=("$v")
     fi
   done <<< "$versions"
@@ -388,6 +386,11 @@ trim_kernels() {
     $SUDO rm -f "$k1" "$k2" "$i1" "$i2"
     log "INFO" "Removed kernel artifacts for $v"
   done
+
+  # Removing kernel files leaves menu entries pointing at missing images.
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    log "INFO" "Regenerate the menu now with: $SCRIPT_NAME  (stale entries otherwise reference deleted kernels)"
+  fi
 }
 
 if [[ "$DO_CHECK" -eq 1 ]]; then

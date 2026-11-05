@@ -53,11 +53,19 @@ readonly WAYBAR_ATOM="gui-apps/waybar"
 # patch (emerge will fail loudly rather than drop it), then update this.
 readonly KNOWN_VERSION="0.15.0"
 
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
+
+# Plain lines for the status report; icons only where a status is asserted.
 say() { printf '%s\n' "$*"; }
-note() { printf '[note] %s\n' "$*"; }
-warn() { printf '[warn] %s\n' "$*" >&2; }
+note() { log_info "$*"; }
+warn() { log_warn "$*"; }
 die() {
-  printf '[error] %s\n' "$*" >&2
+  log_err "$*"
   exit 1
 }
 
@@ -78,7 +86,8 @@ See ../gentoo-waybar-issue.md for the full write-up.
 EOF
 }
 
-require_root() {
+# Richer message than the shared require_root, so the sudo hint is explicit.
+require_root_for_patch() {
   [ "$(id -u)" -eq 0 ] || die "this step writes to ${PATCH_DIR} and runs emerge; re-run with sudo"
 }
 
@@ -231,7 +240,7 @@ live_test() {
 main() {
   case "${1:-}" in
     "")
-      require_root
+      require_root_for_patch
       write_patch
       rebuild
       status
@@ -251,7 +260,7 @@ main() {
       fi
       ;;
     --remove)
-      require_root
+      require_root_for_patch
       if patch_installed; then
         rm -f "$PATCH_FILE"
         rmdir "$PATCH_DIR" 2>/dev/null || true

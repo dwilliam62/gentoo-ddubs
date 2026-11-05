@@ -14,6 +14,13 @@ set -euo pipefail
 #   --dry-run, -n      Preview rsync changes only.
 #   --help, -h         Show this help and exit.
 
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
+
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 
 print_usage() {
@@ -44,14 +51,12 @@ for arg in "$@"; do
   esac
 done
 
-say() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
-
 # rsync helper: src_dir -> dest_dir (creates dest, skips if src missing)
 sync_dir() {
   local src="$1" dest="$2"
   if [ -d "$src" ]; then
     mkdir -p "$dest"
-    say "rsync $(basename "$src") -> ${dest#$repo_root/}"
+    say "rsync $(basename "$src") -> ${dest#"$repo_root"/}"
     rsync -a --delete $dry_run "$src/" "$dest/"
   else
     say "skip (missing): $src"

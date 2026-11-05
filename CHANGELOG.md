@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## Nov 2026
+
+- Refactored all 29 scripts onto a shared library
+  - Added `scripts/lib/common.sh` (with `scripts/lib/README.md` documenting the API)
+    - Colours, icons and helpers: `log_info`/`log_ok`/`log_warn`/`log_err`, `die`, `step`, `run_step`/`run_summary`, `have`, `require_cmd`, `need_root`/`require_root`, `portage_conf_file`, `pkg_installed`, `version_ge`
+    - `portage_conf_file` handles configs that are either a file or a per-package directory
+    - Output honours `NO_COLOR` and non-tty stdout, so icons/colours are now consistent everywhere
+  - Every script sources it through an absolute `SCRIPT_DIR`, so scripts run from any cwd
+  - Each script keeps its historical message prefix and layout (e.g. `[migrate-efi-to-grub]`, `[after-kernel-update]`) as thin wrappers
+  - Steps that fail now surface in a `run_summary` and set a non-zero exit status (`cleanup.sh`, `post-install-cleanup.sh`)
+- Fixed correctness and safety bugs
+  - `update.sh`: post-update report dropped one package row (off-by-one); the `sudo` re-exec lost `JUST_OXWM`; `emaint sync -a` errors were silently ignored
+  - `install-grub-efi.sh`: NVMe/mmcblk devices were truncated to `/dev/nvme0n`; `df` output could wrap on long device names; GRUB target arch is detected instead of hardcoded x86_64
+  - `manage-efi-boot.sh`: `--set-default` replaced the whole `BootOrder`; the initramfs was not copied next to `vmlinuz.efi` (unbootable after module changes); `--switch-grub`/`--switch-efi` now prioritise an entry instead of discarding the others
+  - `migrate-efi-to-grub.sh`: `BootOrder` is prepended to rather than replaced; the detected EFI mountpoint is reused for the boot-entry step instead of assuming `/boot/efi`
+  - `after-kernel-update.sh`: `eclean-kernel -L auto` aborted (only `std`/`blspec` are valid layouts); BLS systems no longer fail trying to verify a GRUB menu they do not boot from
+  - `sync-gentoo-cfg.sh`: `[[ -f /boot/config-* ]]` never expanded a glob; `emerge-info` is not a command (now `emerge --info`); sudo redirects no longer create root-owned log files
+  - `gentoo-cfg-backup.sh`: under `sudo`, `whoami` captured `/root/.config` instead of the invoking user's home
+  - `deploy-dotfiles.sh`, `install-fuse.sh`, `fix-variety.sh`, `install-weather-waybar.sh`: rewritten for idempotency, artifact checks and hard failure instead of continuing half-installed
+  - `install-hyprmod.sh`: `--help` and unknown arguments are handled; `gentoo-install-hyprland.sh` passes Nix installer flags without re-globbing
+  - Repeated `emerge` USE-flag writes are idempotent; `lspci` GPU detection is de-duplicated; `eselect` module probing no longer assumes a fixed module name
+- Lint: shellcheck-clean at warning level across all scripts
+  - Fixed dead variables, `local` masking exit status (SC2155), literal `=~` matching (SC2076), sudo redirects (SC2024) and unquoted pattern removal (SC2295)
+  - Seven `SC2016` notes remain by design: awk field references and a runtime-expanded `$(id -u)` written into shell rc files
+  - shellcheck is not installable here (masked `~amd64`, pulls masked `dev-haskell/aeson`), so the official static binary is used
+
 ## Oct 2026
 
 - Added `scripts/fix-waybar-reload-crash.sh`

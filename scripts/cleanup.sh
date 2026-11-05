@@ -7,68 +7,36 @@ set -euo pipefail
 # - Runs standard maintenance: preserved-rebuild, revdep-rebuild, depclean, eclean-*
 # - Finishes with fstrim -av
 
-if [ -t 1 ]; then
-  C_RESET=$'\033[0m'
-  C_GREEN=$'\033[32m'
-  C_YELLOW=$'\033[33m'
-  C_RED=$'\033[31m'
-  C_BLUE=$'\033[34m'
-  C_GRAY=$'\033[90m'
-else
-  C_RESET=''
-  C_GREEN=''
-  C_YELLOW=''
-  C_RED=''
-  C_BLUE=''
-  C_GRAY=''
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
+
+# When already running as root sudo may be absent (or useless); call tools directly.
+if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+  sudo() { "$@"; }
 fi
 
-OK="${C_GREEN}✔${C_RESET}"
-INFO="${C_BLUE}ℹ${C_RESET}"
-WARN="${C_YELLOW}⚠${C_RESET}"
-ERR="${C_RED}✖${C_RESET}"
-STEPS=0
-FAILURES=0
-STEPS_RUN=()
-STEPS_FAILED=()
-
-say() {
-  printf "%s %s%s%s %s\n" "$1" "${C_GRAY}" "$(date +%H:%M:%S)" "${C_RESET}" "$2"
-}
-
-run_step() {
-  local label="$1"; shift
-  say "$INFO" "Starting ${label} ..."
-  STEPS=$((STEPS + 1))
-  STEPS_RUN+=("$label")
-  if "$@"; then
-    say "$OK" "Done ${label}"
-  else
-    say "$ERR" "Failed ${label} (continuing)"
-    FAILURES=$((FAILURES + 1))
-    STEPS_FAILED+=("$label")
-    return 1
-  fi
-}
-
 sync_guru_repo() {
-  if ! command -v emaint >/dev/null 2>&1; then
-    say "$WARN" "emaint not found; cannot sync GURU"
+  if ! have emaint; then
+    log_warn "emaint not found; cannot sync GURU"
     return 0
   fi
 
   if emaint sync -l 2>/dev/null | awk '{print $1}' | grep -qx 'guru'; then
     run_step "Syncing GURU repo (emaint sync -r guru)" sudo emaint sync -r guru
   else
-    say "$WARN" "GURU repo not configured; skipping"
+    log_warn "GURU repo not configured; skipping"
   fi
 }
 
 refresh_eix() {
-  if command -v eix-update >/dev/null 2>&1; then
+  if have eix-update; then
     run_step "Refreshing eix database" sudo eix-update
   else
-    say "$WARN" "eix-update not found; skipping"
+    log_warn "eix-update not found; skipping"
   fi
 }
 
@@ -78,62 +46,48 @@ main() {
   sync_guru_repo
   refresh_eix
 
-  if command -v emerge >/dev/null 2>&1; then
+  if have emerge; then
     run_step "Rebuilding preserved libs" sudo emerge @preserved-rebuild --quiet
     run_step "Cleaning depclean (asks by default)" sudo emerge --ask --depclean
   else
-    say "$WARN" "emerge not found; skipping preserved-rebuild/depclean"
+    log_warn "emerge not found; skipping preserved-rebuild/depclean"
   fi
 
-  if command -v revdep-rebuild >/dev/null 2>&1; then
+  if have revdep-rebuild; then
     run_step "Running revdep-rebuild" sudo revdep-rebuild -v
   else
-    say "$WARN" "revdep-rebuild not found; skipping"
+    log_warn "revdep-rebuild not found; skipping"
   fi
 
-  if command -v emaint >/dev/null 2>&1; then
+  if have emaint; then
     run_step "emaint --fix cleanresume" sudo emaint --fix cleanresume
   fi
 
-  if command -v eclean-dist >/dev/null 2>&1; then
+  if have eclean-dist; then
     run_step "Cleaning old distfiles (eclean-dist -d)" sudo eclean-dist -d
   else
-    say "$WARN" "eclean-dist not found; skipping"
+    log_warn "eclean-dist not found; skipping"
   fi
 
-  if command -v eclean-pkg >/dev/null 2>&1; then
+  if have eclean-pkg; then
     run_step "Cleaning old binary packages (eclean-pkg)" sudo eclean-pkg
   else
-    say "$WARN" "eclean-pkg not found; skipping"
+    log_warn "eclean-pkg not found; skipping"
   fi
 
-  if command -v fstrim >/dev/null 2>&1; then
+  if have fstrim; then
     run_step "Running fstrim on all mounted filesystems" sudo fstrim -av
   else
-    say "$WARN" "fstrim not found; skipping"
+    log_warn "fstrim not found; skipping"
   fi
 
   end_ts=$(date +%s)
   elapsed=$((end_ts - start_ts))
-  elapsed_hms=$(printf "%02d:%02d:%02d" $((elapsed/3600)) $(((elapsed%3600)/60)) $((elapsed%60)))
+  elapsed_hms=$(printf "%02d:%02d:%02d" $((elapsed / 3600)) $(((elapsed % 3600) / 60)) $((elapsed % 60)))
 
-  echo
-  say "${C_BLUE}★${C_RESET}" "Summary"
-  say "$INFO" "Steps run: ${STEPS}"
-  say "$INFO" "Failures: ${FAILURES}"
-  say "$INFO" "Elapsed: ${elapsed_hms}"
-  if [ "${#STEPS_RUN[@]}" -gt 0 ]; then
-    say "$INFO" "Steps attempted:"
-    for s in "${STEPS_RUN[@]}"; do
-      printf "  %b %s\n" "$OK" "$s"
-    done
-  fi
-  if [ "${#STEPS_FAILED[@]}" -gt 0 ]; then
-    say "$WARN" "Steps failed:"
-    for s in "${STEPS_FAILED[@]}"; do
-      printf "  %b %s\n" "$ERR" "$s"
-    done
-  fi
+  log_info "Elapsed: ${elapsed_hms}"
+  # Returns non-zero when a step failed, so callers and cron can react.
+  run_summary
 }
 
 main "$@"

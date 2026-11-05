@@ -37,7 +37,12 @@ post_md="$log_dir/Post-Update-${now_ts}-Report.md"
 OXWM_REPO_URL="https://github.com/tonybanters/oxwm"
 OXWM_DIR="/opt/oxwm"
 
-say() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
 
 oxwm_build_user() {
   if [ -d "$OXWM_DIR" ]; then
@@ -159,8 +164,9 @@ Examples:
 EOF
 }
 
-need_root() {
-  # Escalate when applying changes or when syncing in --eval/--dry-run modes
+escalate_if_needed() {
+  # Script-specific policy: escalate only when applying changes or when a sync
+  # will run in --eval/--dry-run mode.
   local need_sudo=false
   if [ "${JUST_OXWM:-false}" = "true" ]; then
     need_sudo=true
@@ -172,7 +178,11 @@ need_root() {
   
   if [ "$need_sudo" = "true" ]; then
     [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
-    exec sudo -E env DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" NO_SYNC="${NO_SYNC:-false}" USE_BINPKGS="${USE_BINPKGS:-false}" AUTO_YES="${AUTO_YES:-false}" APPLY="${APPLY:-false}" SKIP_QUICKSHELL="${SKIP_QUICKSHELL:-false}" bash "$0" "$@"
+    exec sudo -E env \
+      DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" JUST_OXWM="${JUST_OXWM:-false}" \
+      NO_SYNC="${NO_SYNC:-false}" USE_BINPKGS="${USE_BINPKGS:-false}" AUTO_YES="${AUTO_YES:-false}" \
+      APPLY="${APPLY:-false}" SKIP_QUICKSHELL="${SKIP_QUICKSHELL:-false}" \
+      bash "$0" "$@"
   fi
 }
 
@@ -245,7 +255,7 @@ maybe_sync() {
   
   if command -v emaint >/dev/null 2>&1; then
     say "Syncing all repos (emaint sync -a)..."
-    emaint sync -a || true
+    emaint sync -a || say "WARN: emaint sync reported errors; continuing with the existing tree."
   else
     say "Syncing Portage tree (emerge --sync)..."
     emerge --sync
@@ -274,7 +284,7 @@ maybe_update_eix() {
 # Input: stdin = output of `emerge -pvuDU --with-bdeps=y @world` (no color)
 # Output: writes markdown to precheck_md and also echoes to stdout
 summarize_pretend_to_md() {
-  local tmp pret
+  local tmp
   tmp="$(mktemp)"
   cat >"$tmp"
 
@@ -335,8 +345,9 @@ write_post_update_report() {
     echo "## Summary"
     # Count lines in precheck table (skip header + separator)
     local upgraded=0
-    if grep -q '^\| ' "$pre_file" 2>/dev/null; then
-      upgraded=$(grep -E '^\| ' "$pre_file" | tail -n +3 | wc -l | tr -d ' ')
+    if grep -q '^| ' "$pre_file" 2>/dev/null; then
+      # The first matching line is the table header; every later line is a package.
+      upgraded=$(grep -E '^\| ' "$pre_file" | tail -n +2 | wc -l | tr -d ' ')
     fi
     echo "- Packages upgraded: $upgraded"
 
@@ -346,8 +357,8 @@ write_post_update_report() {
       echo
       echo "| Package | From | To |"
       echo "|---|---:|---:|"
-      # Reuse the precheck table rows
-      grep -E '^\| ' "$pre_file" | tail -n +3 | awk -F'|' '{gsub(/^ +| +$/, "", $2); gsub(/^ +| +$/, "", $3); gsub(/^ +| +$/, "", $4); if($2!=""){print "| "$2" | "$3" | "$4" |"}}'
+      # Reuse the precheck table rows (skip the header line)
+      grep -E '^\| ' "$pre_file" | tail -n +2 | awk -F'|' '{gsub(/^ +| +$/, "", $2); gsub(/^ +| +$/, "", $3); gsub(/^ +| +$/, "", $4); if($2!=""){print "| "$2" | "$3" | "$4" |"}}'
     else
       echo "No package upgrades were planned (system was up-to-date)."
     fi
@@ -417,8 +428,8 @@ maybe_refresh_grub_for_new_kernel() {
 }
 
 main() {
-  # Ensure we have root when needed (apply mode or sync in eval/dry-run)
-  need_root update "$@"
+  # Re-exec once when this mode needs root; arguments are forwarded unchanged.
+  escalate_if_needed "$@"
   if [ "$JUST_OXWM" = "true" ]; then
     update_oxwm_repo
     say "Done."

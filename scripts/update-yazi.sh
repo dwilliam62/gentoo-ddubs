@@ -11,8 +11,11 @@ GURU_REPO_CONF="/etc/portage/repos.conf/guru.conf"
 GURU_SYNC_URI="https://gitweb.gentoo.org/repo/proj/guru.git"
 MIN_RUSTC_VERSION_LIVE="1.95.0"
 
-say() {
-  printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
 }
 
 current_rustc_version() {
@@ -21,14 +24,6 @@ current_rustc_version() {
   fi
 
   rustc --version 2>/dev/null | awk '{print $2}' | sed 's/-.*$//'
-}
-
-version_ge() {
-  local actual="$1"
-  local required="$2"
-
-  [[ -n "$actual" && -n "$required" ]] || return 1
-  [[ "$(printf '%s\n%s\n' "$required" "$actual" | sort -V | head -n 1)" == "$required" ]]
 }
 
 ensure_min_rustc_for_live() {
@@ -245,15 +240,11 @@ status_yazi() {
   fi
 }
 
-need_root() {
-  if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    exec sudo -E bash "$0" "$@"
-  fi
-}
 ensure_guru_repo() {
   if ! command -v eselect >/dev/null 2>&1; then
     say "Installing app-eselect/eselect-repository for guru overlay management..."
-    emerge --ask=n app-eselect/eselect-repository
+    emerge --ask=n app-eselect/eselect-repository ||
+      say "WARN: Failed to install eselect-repository; using a repos.conf entry instead."
   fi
 
   if eselect repository list 2>/dev/null | awk '/\*/ {print $2}' | grep -qx "guru"; then

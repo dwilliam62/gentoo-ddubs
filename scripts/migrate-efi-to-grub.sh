@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-log() {
-  printf '[migrate-efi-to-grub] %s\n' "$*"
-}
-
-die() {
-  printf '[migrate-efi-to-grub] ERROR: %s\n' "$*" >&2
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
   exit 1
 }
 
-require_root() {
-  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    die "must be run as root"
-  fi
+log() { log_info "[migrate-efi-to-grub] $*"; }
+die() {
+  log_err "[migrate-efi-to-grub] ERROR: $*"
+  exit 1
 }
 
 detect_efi_mountpoint() {
@@ -63,8 +61,10 @@ ensure_kernel_package() {
 }
 
 install_grub() {
-  local efi_dir target
-  efi_dir="$(detect_efi_mountpoint)" || die "EFI mountpoint not found (expected /boot/efi, /efi, or /boot)"
+  local target
+  # detect_efi_mountpoint may pick /efi or /boot, so keep the result for the
+  # EFI-entry step instead of assuming /boot/efi there.
+  EFI_DIR="$(detect_efi_mountpoint)" || die "EFI mountpoint not found (expected /boot/efi, /efi, or /boot)"
 
   case "$(uname -m)" in
     x86_64) target="x86_64-efi" ;;
@@ -72,17 +72,18 @@ install_grub() {
     *) die "unsupported architecture for GRUB EFI: $(uname -m)" ;;
   esac
 
-  log "Installing GRUB to ${efi_dir}"
+  log "Installing GRUB to ${EFI_DIR}"
   emerge --verbose sys-boot/grub
-  grub-install --target="$target" --efi-directory="$efi_dir" --bootloader-id="GentooGRUB" --recheck
+  grub-install --target="$target" --efi-directory="$EFI_DIR" --bootloader-id="GentooGRUB" --recheck
   mkdir -p /boot/grub
   grub-mkconfig -o /boot/grub/grub.cfg
 }
 ensure_grub_efi_entry() {
   local efi_source disk part entry_id
-  efi_source="$(findmnt -no SOURCE /boot/efi 2>/dev/null || true)"
+  local efi_dir="${EFI_DIR:-/boot/efi}"
+  efi_source="$(findmnt -no SOURCE "$efi_dir" 2>/dev/null || true)"
   if [[ -z "$efi_source" ]]; then
-    die "Could not determine EFI device from /boot/efi"
+    die "Could not determine EFI device from ${efi_dir}"
   fi
 
   if [[ "$efi_source" =~ ^(/dev/.+p)([0-9]+)$ ]]; then
@@ -103,8 +104,20 @@ ensure_grub_efi_entry() {
   fi
 
   if [[ -n "$entry_id" ]]; then
-    log "Setting BootOrder to prioritize GRUB entry Boot${entry_id}"
-    efibootmgr --bootorder "${entry_id}"
+    # Prepend GRUB to the existing BootOrder instead of replacing it, otherwise
+    # every other boot entry loses its position.
+    local order new_order e existing
+    order="$(efibootmgr | awk '/^BootOrder:/ {print $2; exit}')"
+    new_order="$entry_id"
+    if [[ -n "$order" ]]; then
+      IFS=',' read -r -a existing <<< "$order"
+      for e in "${existing[@]}"; do
+        [[ -z "$e" || "$e" == "$entry_id" ]] && continue
+        new_order+=",$e"
+      done
+    fi
+    log "Setting BootOrder to prioritize GRUB entry Boot${entry_id} (${new_order})"
+    efibootmgr --bootorder "$new_order"
     efibootmgr --bootnext "${entry_id}" || true
   else
     log "WARN: Could not determine GRUB entry ID; BootOrder unchanged."

@@ -9,96 +9,114 @@
 # Gentoo hyprmod installer with edgets repo setup
 #
 
-set -o pipefail
+set -euo pipefail
 
-KEYWORDS_FILE="/etc/portage/package.accept_keywords/edgets"
-
-msg() {
-	printf '%s\n' "$1"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
 }
 
-error() {
-	printf 'ERROR: %s\n' "$1" >&2
-}
-
-require_command() {
-	if ! command -v "$1" >/dev/null 2>&1; then
-		error "Required command '$1' was not found."
-		return 1
-	fi
-}
+KEYWORDS_BASE="/etc/portage/package.accept_keywords"
+KEYWORDS_ENTRY="*/*::edgets ~amd64"
 
 setup_edgets_repository() {
-	msg "Setting up edgets repository..."
+  log_info "Setting up edgets repository..."
 
-	require_command eselect || {
-		msg "eselect not found. Installing eselect-repository..."
-		if ! sudo emerge --ask app-eselect/eselect-repository; then
-			error "Failed to install eselect-repository"
-			return 1
-		fi
-	}
+  # eselect-repository ships as an eselect module; probe the module, and make
+  # sure the install actually produced a usable eselect afterwards.
+  if ! have eselect || ! eselect repository list >/dev/null 2>&1; then
+    log_info "eselect-repository not usable. Installing app-eselect/eselect-repository..."
+    if ! sudo emerge --ask app-eselect/eselect-repository; then
+      log_err "Failed to install eselect-repository"
+      return 1
+    fi
+    if ! have eselect; then
+      log_err "eselect is still unavailable after installation."
+      return 1
+    fi
+  fi
 
-	msg "Enabling edgets repository..."
-	if ! sudo eselect repository enable edgets; then
-		error "Failed to enable edgets repository"
-		return 1
-	fi
+  log_info "Enabling edgets repository..."
+  if ! sudo eselect repository enable edgets; then
+    log_warn "Could not enable the edgets repository; it may already be configured."
+  fi
 
-	msg "Syncing portage tree..."
-	if ! sudo emerge --sync; then
-		error "Failed to sync portage tree"
-		return 1
-	fi
+  log_info "Syncing portage tree..."
+  if have emaint; then
+    if ! sudo emaint sync -r edgets; then
+      log_warn "Syncing edgets failed; continuing with the existing metadata."
+    fi
+  elif ! sudo emerge --sync; then
+    log_warn "emerge --sync failed; continuing with the existing tree."
+  fi
 
-	msg "Edgets repository setup complete."
+  log_ok "Edgets repository setup complete."
 }
 
 setup_package_keywords() {
-	msg "Configuring package keywords for edgets..."
+  log_info "Configuring package keywords for edgets..."
 
-	if [[ ! -d /etc/portage/package.accept_keywords ]]; then
-		msg "Creating /etc/portage/package.accept_keywords directory..."
-		sudo mkdir -p /etc/portage/package.accept_keywords
-	fi
+  local keywords_file
+  keywords_file="$(portage_conf_file "$KEYWORDS_BASE" edgets)"
+  install -d "$(dirname "$keywords_file")"
 
-	if [[ -f "$KEYWORDS_FILE" ]]; then
-		if grep -q '^\*\/\*::edgets' "$KEYWORDS_FILE"; then
-			msg "edgets keyword entry already exists in $KEYWORDS_FILE"
-			return 0
-		fi
-	fi
+  if [ -f "$keywords_file" ] && grep -qF -- "$KEYWORDS_ENTRY" "$keywords_file"; then
+    log_ok "edgets keyword entry already exists in ${keywords_file}"
+    return 0
+  fi
 
-	msg "Adding edgets keyword entry to $KEYWORDS_FILE..."
-	echo "*/*::edgets ~amd64" | sudo tee -a "$KEYWORDS_FILE" >/dev/null
-
-	if [[ $? -eq 0 ]]; then
-		msg "Keywords configured successfully."
-	else
-		error "Failed to configure package keywords"
-		return 1
-	fi
+  log_info "Adding edgets keyword entry to ${keywords_file}..."
+  printf '%s\n' "$KEYWORDS_ENTRY" | sudo tee -a "$keywords_file" >/dev/null
+  log_ok "Keywords configured successfully."
 }
 
 install_hyprmod() {
-	msg "Installing hyprmod from edgets repository..."
+  log_info "Installing hyprmod from edgets repository... (confirm with 'y' if asked)"
 
-	if ! sudo emerge -a hyprmod; then
-		error "hyprmod installation failed"
-		return 1
-	fi
+  if ! sudo emerge -a hyprmod; then
+    log_err "hyprmod installation failed"
+    return 1
+  fi
 
-	msg "hyprmod installed successfully."
+  log_ok "hyprmod installed successfully."
+}
+
+print_usage() {
+  cat <<'EOF'
+Usage: install-hyprmod.sh [--help|-h]
+
+Enable the edgets overlay, accept its keywords, and install hyprmod.
+With no arguments the full installation runs.
+EOF
 }
 
 main() {
-	msg "Starting hyprmod installation for Gentoo..."
+  case "${1:-}" in
+    -h | --help)
+      print_usage
+      return 0
+      ;;
+    "") ;;
+    *)
+      log_err "unknown argument: $1 (try --help)"
+      return 1
+      ;;
+  esac
 
-	setup_edgets_repository || return 1
-	setup_package_keywords || return 1
-	install_hyprmod || return 1
+  log_info "Starting hyprmod installation for Gentoo..."
 
-	msg "Installation complete!"
+  if ! have emerge; then
+    log_err "emerge not found; this script is for Gentoo only."
+    return 1
+  fi
+
+  setup_edgets_repository || return 1
+  setup_package_keywords || return 1
+  install_hyprmod || return 1
+
+  log_ok "Installation complete!"
 }
 
-main
+main "$@"

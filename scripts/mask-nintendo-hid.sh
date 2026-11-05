@@ -1,45 +1,70 @@
 #!/usr/bin/env bash
+# Mask games-util/hid-nintendo from the GURU overlay and provide the dummy
+# linux-mod eclass it pulls in, so unrelated emerges are not blocked by it.
+set -euo pipefail
 
-# Exit immediately if any command fails
-set -e
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
 
-# Define paths based on your system configuration
 GURU_REPO="/var/db/repos/guru"
 ECLASS_DIR="${GURU_REPO}/eclass"
 DUMMY_ECLASS="${ECLASS_DIR}/linux-mod.eclass"
+MASK_BASE="/etc/portage/package.mask"
+MASK_ATOM="games-util/hid-nintendo"
+PROFILE_MASK_DIR="/etc/portage/profile"
+PROFILE_MASK="${PROFILE_MASK_DIR}/package.mask"
 
-echo "=== Starting Gentoo GURU Mask & Fix Automation ==="
+need_root "$@"
 
-# 1. Ensure the guru repo eclass directory exists
-echo "-> Ensuring directory exists: ${ECLASS_DIR}"
-mkdir -p "${ECLASS_DIR}"
+printf '%s\n' "=== Gentoo GURU mask & fix automation ==="
 
-# 2. Write the dummy eclass file directly into GURU
-echo "-> Creating dummy linux-mod.eclass inside GURU..."
-cat << 'EOF' > "${DUMMY_ECLASS}"
+if [ ! -d "$GURU_REPO" ]; then
+  log_warn "GURU repo not found at ${GURU_REPO}; enable it first with 'eselect repository enable guru'."
+fi
+
+log_info "Ensuring directory exists: ${ECLASS_DIR}"
+install -d "$ECLASS_DIR"
+
+log_info "Creating dummy linux-mod.eclass inside GURU..."
+cat >"$DUMMY_ECLASS" <<'EOF'
 # Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 # Dummy eclass to satisfy broken GURU overlay imports
 EOF
+log_ok "Wrote ${DUMMY_ECLASS}"
 
-# 3. Add to package.mask (standard structure)
-echo "-> Ensuring standard package.mask block is active..."
-mkdir -p /etc/portage/package.mask
-cat << 'EOF' > /etc/portage/package.mask/hid-nintendo
-# Mask hid-nintendo since it requires linux-mod eclass and we don't use Nintendo controllers
-games-util/hid-nintendo::guru
-EOF
+# /etc/portage/package.mask may be a single file or a directory of snippets.
+mask_file="$(portage_conf_file "$MASK_BASE" hid-nintendo)"
+install -d "$(dirname "$mask_file")"
 
-# 4. Add to profile mask (metadata filtering backup)
-echo "-> Ensuring profile package.mask block is active..."
-mkdir -p /etc/portage/profile
-if ! grep -q "games-util/hid-nintendo" /etc/portage/profile/package.mask 2>/dev/null; then
-    echo "games-util/hid-nintendo" >> /etc/portage/profile/package.mask
+if grep -qF -- "$MASK_ATOM" "$mask_file" 2>/dev/null; then
+  log_ok "Mask already present in ${mask_file}"
+else
+  {
+    echo "# Mask hid-nintendo: it requires linux-mod.eclass and Nintendo controllers are unused here"
+    echo "${MASK_ATOM}::guru"
+  } >>"$mask_file"
+  log_ok "Added ${MASK_ATOM} mask to ${mask_file}"
 fi
 
-# 5. Regenerate Portage repository caches as root
-echo "-> Regenerating GURU cache matrix..."
-egencache --repo=guru --update
+install -d "$PROFILE_MASK_DIR"
+if grep -qF -- "$MASK_ATOM" "$PROFILE_MASK" 2>/dev/null; then
+  log_ok "Profile mask already present in ${PROFILE_MASK}"
+else
+  printf '%s\n' "$MASK_ATOM" >>"$PROFILE_MASK"
+  log_ok "Added ${MASK_ATOM} to ${PROFILE_MASK}"
+fi
 
-echo "=== Success! You can now safely run your emerge commands ==="
+log_info "Regenerating GURU repository cache..."
+if have egencache; then
+  egencache --repo=guru --update ||
+    log_warn "egencache failed; run 'emaint sync -r guru' and re-run this script."
+else
+  log_warn "egencache not found (install app-portage/portage-utils); skipping cache refresh."
+fi
 
+log_ok "Done. You can now safely run your emerge commands."

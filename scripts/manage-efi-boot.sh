@@ -10,20 +10,27 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+	printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+	exit 1
+}
+
 msg() {
 	printf '%s\n' "$1"
 }
 
 error() {
-	printf '\033[0;31mERROR:\033[0m %s\n' "$1" >&2
+	log_err "$1"
 }
 
 success() {
-	printf '\033[0;32m✓\033[0m %s\n' "$1"
+	log_ok "$1"
 }
 
 warn() {
-	printf '\033[1;33m⚠\033[0m %s\n' "$1"
+	log_warn "$1"
 }
 
 show_usage() {
@@ -35,8 +42,8 @@ Manage UEFI EFI boot entries and direct kernel boot.
 Options:
   --check              Show current EFI boot configuration
   --update-efi KERNEL  Update EFI kernel entry to specified kernel version
-  --set-default INDEX  Set default EFI boot entry by index
-  --switch-grub        Change boot order to prefer GRUB (Boot0002)
+  --set-default INDEX  Boot the given entry next (BootNext)
+  --switch-grub        Change boot order to prefer GRUB
   --switch-efi         Change boot order to prefer direct EFI kernel boot
   -h, --help           Show this help
 
@@ -57,10 +64,7 @@ EOF
 }
 
 check_root() {
-	if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-		error "must be run as root"
-		exit 1
-	fi
+	require_root
 }
 
 check_efi_boot_config() {
@@ -144,10 +148,10 @@ update_efi_kernel() {
 	fi
 
 	msg "Creating EFI kernel for version ${kernel_version}..."
-
-	# Create EFI kernel using objcopy
-	# This requires the kernel to be built with EFI stub support
+	# Update the kernel *and* its initramfs: booting a new kernel with the old
+	# initramfs leaves the system unbootable when kernel modules change.
 	cp "/boot/kernel-${kernel_version}" /boot/efi/vmlinuz.efi
+	cp "/boot/initramfs-${kernel_version}.img" /boot/efi/initramfs.img
 
 	msg "Updating EFI boot parameters..."
 	# Note: EFI kernel parameters are typically embedded at build time
@@ -165,14 +169,45 @@ set_efi_default() {
 		return 1
 	fi
 
-	msg "Setting EFI default boot entry to $index..."
+	msg "Setting EFI default boot entry to $index (next boot only)..."
 	efibootmgr -n "$index" || {
 		error "Failed to set default boot entry"
 		return 1
 	}
 
-	success "Default boot entry set to $index"
+	success "Boot entry $index will be used for the next boot"
 	efibootmgr | head -2
+}
+
+# Put one entry first in BootOrder and boot it next. BootOrder is rewritten
+# rather than replaced, so the remaining entries keep their relative order.
+prioritize_boot_entry() {
+  local entry="$1" order new_order e
+
+  if ! [[ "$entry" =~ ^[0-9A-Fa-f]{1,4}$ ]]; then
+    error "Invalid boot entry id: $entry"
+    return 1
+  fi
+  entry="$(printf '%04X' "$((16#$entry))")"
+
+  order="$(efibootmgr | awk '/^BootOrder:/ {print $2; exit}')"
+  new_order="$entry"
+  if [[ -n "$order" ]]; then
+    local entries
+    IFS=',' read -r -a entries <<< "$order"
+    for e in "${entries[@]}"; do
+      [[ -z "$e" || "$e" == "$entry" ]] && continue
+      new_order+=",$e"
+    done
+  fi
+
+  efibootmgr --bootorder "$new_order" || {
+    error "Failed to update BootOrder"
+    return 1
+  }
+  efibootmgr --bootnext "$entry" >/dev/null 2>&1 || true
+
+  success "BootOrder=${new_order}; Boot${entry} boots next"
 }
 
 switch_to_grub() {
@@ -196,7 +231,7 @@ switch_to_grub() {
 	fi
 
 	msg "Setting boot order to prefer GRUB (Boot${grub_index})..."
-	set_efi_default "$grub_index" || return 1
+	prioritize_boot_entry "$grub_index" || return 1
 }
 
 switch_to_efi() {
@@ -213,7 +248,7 @@ switch_to_efi() {
 	fi
 
 	msg "Setting boot order to prefer EFI kernel (Boot${efi_index})..."
-	set_efi_default "$efi_index" || return 1
+	prioritize_boot_entry "$efi_index" || return 1
 }
 
 main() {

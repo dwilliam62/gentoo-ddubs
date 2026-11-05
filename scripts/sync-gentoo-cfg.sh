@@ -13,6 +13,11 @@ set -euo pipefail
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
 SYSTEM_DIR="${REPO_ROOT}/system"
 LOG_DIR="${REPO_ROOT}/.sync-logs"
 LOG_FILE="${LOG_DIR}/sync-$(date +%s).log"
@@ -60,7 +65,9 @@ rsync_cmd() {
   [[ "$VERBOSE" == true ]] || opts+=("--quiet")
   [[ "$DRY_RUN" == true ]] && opts+=("--dry-run")
   
-  if sudo rsync "${opts[@]}" "$src" "$dst" >> "$LOG_FILE" 2>&1; then
+  # tee keeps the redirect owned by the caller while sudo only runs rsync;
+  # pipefail (set at the top) preserves rsync's exit status.
+  if sudo rsync "${opts[@]}" "$src" "$dst" 2>&1 | tee -a "$LOG_FILE" >/dev/null; then
     log_msg "✓ Synced: $src"
   else
     log_error "✗ Failed to sync: $src"
@@ -116,8 +123,11 @@ done
 # Sync kernel config
 log_msg ""
 log_msg ">>> Syncing kernel configuration..."
-if [[ -f /boot/config-* ]]; then
-  rsync_cmd /boot/config-* "${SYSTEM_DIR}/boot/" || true
+# A glob inside [[ -f ]] is not expanded, so test it with compgen first.
+if compgen -G "/boot/config-*" >/dev/null; then
+  for boot_cfg in /boot/config-*; do
+    rsync_cmd "$boot_cfg" "${SYSTEM_DIR}/boot/" || true
+  done
 fi
 if [[ -f /usr/src/linux/.config ]]; then
   rsync_cmd /usr/src/linux/.config "${SYSTEM_DIR}/usr/src/linux/.config" || true
@@ -142,13 +152,14 @@ log_msg ""
 log_msg ">>> Exporting system metadata..."
 mkdir -p "${REPO_ROOT}/docs"
 
-if command -v emerge-info &>/dev/null; then
-  sudo emerge-info > "${REPO_ROOT}/docs/emerge-info.txt" 2>&1
+# `emerge-info` is not a command; the information lives behind `emerge --info`.
+if command -v emerge &>/dev/null; then
+  sudo emerge --info 2>&1 | tee "${REPO_ROOT}/docs/emerge-info.txt" >/dev/null
   log_msg "✓ Exported emerge-info.txt"
 fi
 
 if command -v eselect &>/dev/null; then
-  sudo eselect profile show > "${REPO_ROOT}/docs/eselect-profile.txt" 2>&1
+  sudo eselect profile show 2>&1 | tee "${REPO_ROOT}/docs/eselect-profile.txt" >/dev/null
   log_msg "✓ Exported eselect-profile.txt"
 fi
 

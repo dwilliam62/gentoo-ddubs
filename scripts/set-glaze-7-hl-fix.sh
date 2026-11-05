@@ -18,15 +18,16 @@
 
 set -euo pipefail
 
-# ANSI color codes
-BOLD="\033[1m"
-DIM="\033[2m"
-RESET="\033[0m"
-CYAN="\033[1;36m"
-GREEN="\033[1;32m"
-YELLOW="\033[1;33m"
-RED="\033[1;31m"
-WHITE="\033[1;37m"
+# The option parser consumes "$@", so keep the original arguments: the sudo
+# re-exec below must receive the flags the user actually passed.
+ORIG_ARGS=("$@")
+
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/lib/common.sh" || {
+  printf '✖ Missing %s/lib/common.sh\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
 
 MASK_FILE="/etc/portage/package.mask/glaze"
 TARGET_GLAZE_ATOM="=dev-cpp/glaze-7.0.2::hyproverlay"
@@ -104,7 +105,7 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
   else
     if command -v sudo >/dev/null 2>&1; then
       printf "%bEscalating to root privileges via sudo...%b\n" "${CYAN}" "${RESET}"
-      exec sudo bash "$0" "$@"
+      exec sudo bash "$0" "${ORIG_ARGS[@]}"
     else
       printf "%bError: Root privileges required. Please run with sudo or as root.%b\n" "${RED}" "${RESET}" >&2
       exit 1
@@ -415,11 +416,11 @@ format_status() {
 
 printf "  ${BOLD}%-26s %s${RESET}\n" "COMPONENT" "STATUS"
 printf "  ${DIM}%-26s %s${RESET}\n" "──────────────────────────" "────────────────────────────────"
-printf "  %-26s $(format_status "$STATUS_MASK")\n" "Portage Mask (glaze>=8):"
+printf "  %-26s %s\n" "Portage Mask (glaze>=8):" "$(format_status "$STATUS_MASK")"
 printf "  %-26s %s -> %s\n" "Glaze Version:" "${INITIAL_GLAZE:-none}" "${POST_GLAZE:-none}"
-printf "  %-26s $(format_status "$STATUS_GLAZE_PKG")\n" "Glaze 7 Package:"
-printf "  %-26s $(format_status "$STATUS_HYPRLAND_BUILD")\n" "Hyprland Rebuild:"
-printf "  %-26s $(format_status "$STATUS_PRESERVED")\n" "Preserved Rebuild:"
+printf "  %-26s %s\n" "Glaze 7 Package:" "$(format_status "$STATUS_GLAZE_PKG")"
+printf "  %-26s %s\n" "Hyprland Rebuild:" "$(format_status "$STATUS_HYPRLAND_BUILD")"
+printf "  %-26s %s\n" "Preserved Rebuild:" "$(format_status "$STATUS_PRESERVED")"
 printf "  ${DIM}%-26s %s${RESET}\n" "──────────────────────────" "────────────────────────────────"
 
 if [ "$OVERALL_RESULT" = "SUCCESS" ]; then
