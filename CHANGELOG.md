@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file.
   - Suppressed Portage's "binary packages have been ignored due to non matching USE" warning with `--binpkg-respect-use=y` on every emerge
   - Step 6 now uses `--oneshot` so the Qt dependencies stay out of `@world`; `@world` keeps only `gui-apps/contour`
   - Added non-fatal warnings when global `USE` or another `package.use` file turns `qml`/`vulkan` back on, followed by the effective per-package flags from `equery uses`
+  - Handles both layouts for `package.accept_keywords`, `package.mask` and `package.use`: a missing path is created as a directory, an existing directory gets the dedicated snippet, and an existing single file only has the missing entries appended (with a `# managed by install-contour.sh` marker) instead of being overwritten
 - Finished the remaining review findings
   - `after-kernel-update.sh` handles `vmlinuz-*` images as well as `kernel-*` when pruning, detecting the newest kernel, verifying artifacts and checking `grub.cfg` (exact image names only, not a loose `-<version>` match)
   - `after-kernel-update.sh` gained `--check`/`--dry-run`: it lists the /boot images it recognises, the prune decisions, the newest-kernel artifacts and the GRUB reference, changes nothing, and exits non-zero on problems. `/boot` is usually `0700 root`, so such hosts need `sudo` even for the check
@@ -56,6 +57,12 @@ All notable changes to this project will be documented in this file.
   - `set-glaze-7-hl-fix.sh` and `update-yazi.sh` no longer truncate an existing mask file or `repos.conf` entry in place
   - `docs/fix-contour-plan.md`: the Phase 2.8 backup recipe copies outside `/etc/portage`; rows 8 and 9 match the script's backup and `--oneshot` behaviour
   - `set-glaze-7-hl-fix.sh`: the check-mode advice lines and the final summary printed a literal `\n\n` (their printf formats carried escaped backslashes); they now emit real line breaks
+- Hardened `scripts/install-hyprmod.sh`
+  - Re-execs through `need_root`, so creating `/etc/portage/package.accept_keywords` no longer fails with a bare “Permission denied” on fresh hosts; Portage commands run without repeated `sudo`
+  - Detects `ARCH` with `portageq envvar ARCH` instead of hardcoding `~amd64`, and anchors the duplicate check so a commented-out entry is not mistaken for an active one
+  - Verifies that the `edgets` repository is enabled and synced, failing with an actionable message instead of continuing to a confusing “hyprmod installation failed”
+  - Added `--check-only`, which reports repository/keyword state and previews `emerge -p -v gui-apps/hyprmod` without changing anything
+  - Uses `--ask` only on a terminal, so unattended runs do not block, and verifies the `hyprmod` executable after the merge
 
 ## Oct 2026
 

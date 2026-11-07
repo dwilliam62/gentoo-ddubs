@@ -33,6 +33,7 @@ The script fixes the issues found on that host, but it is **not a universal fix*
 - Warns when any of the three managed files already holds entries the new contents
   drop, and points at a separate `-extra` snippet (`package.use/contour-extra` for
   example) so host-specific entries survive a rerun.
+- Handles both layouts for these three files: a missing path is created as a directory, an existing directory gets the dedicated snippet, and an existing single file only has the missing entries appended (with a `# managed by install-contour.sh` marker) instead of being overwritten.
 - Warns when global USE or another `package.use` file re-enables `qml`/`vulkan`, and prints the effective flags from `equery uses`.
 - Provides `--check-only`, which writes the Portage configuration, skips overlay setup (Steps 1–2), and previews both emerge commands with `--pretend`.
 
@@ -40,14 +41,14 @@ The script fixes the issues found on that host, but it is **not a universal fix*
 
 | # | Condition | What happens | Required action |
 |---|-----------|--------------|-----------------|
-| 1 | `/etc/portage/package.use`, `package.accept_keywords` or `package.mask` is a single file, not a directory | `mkdir -p` fails and the script exits at Step 3 | Convert to directories after backing up (Phase 2.1) |
+| 1 | `/etc/portage/package.use`, `package.accept_keywords` or `package.mask` is a single file, not a directory | Supported: missing entries are appended with a marker instead of overwriting the file | No action needed; converting to directories is optional (Phase 2.1) |
 | 2 | Binary-only defaults: `EMERGE_DEFAULT_OPTS` contains `--usepkgonly` or `--getbinpkgonly` | Portage refuses to build from source when no matching binpkg exists; Step 1/6/7 fail | Remove the “only” option for this run (Phase 2.2) |
 | 3 | Host tree has no Qt 6.11.x stable, or Qt is keyword-pinned older than Contour needs | `emerge` reports keyword changes or the Contour build fails on Qt API | Accept keywords for the minimum Qt stack, or skip that host (Phase 2.3) |
 | 4 | Host is Wayland-only and `dev-qt/qtwayland` is not installed | Contour has no Wayland platform plugin; it may fail to start or fall back to XWayland | Install `dev-qt/qtwayland` if Wayland is the session (Phase 2.5) |
 | 5 | No OpenGL 3.3 driver (common in minimal VMs) | Contour cannot create its rendering context | Install/configure Mesa or enable software rendering (Phase 2.6) |
 | 6 | `virtual/minizip` is not installed | `sys-libs/zlib minizip` forces an unnecessary zlib rebuild | Optional: drop that line on this host (Phase 2.4) |
 | 7 | GURU is unavailable/offline or has a newer Contour | Script warns but continues; a newer version may not need the libunicode mask | Verify GURU and the ebuild version before the full run (Phase 2.7) |
-| 8 | Existing files at the three script-written paths | The script replaces them, but now backs the old contents up to `/root/portage-backups` first (and skips the write when nothing changed) | Move host-specific lines into a separate file such as `package.use/contour-extra` so a rerun cannot drop them (Phase 2.8) |
+| 8 | Existing files at the three script-written paths | Directory layout: the dedicated snippets are replaced after a backup to `/root/portage-backups` (unchanged files are left alone). Single-file layout: only missing entries are appended | Move host-specific lines into a separate file such as `package.use/contour-extra` so a rerun cannot drop them (Phase 2.8) |
 | 9 | `app-eselect/eselect-repository` is newly installed by Step 1 | The script passes `--oneshot`, so it is not added to `@world`; an entry selected by an earlier run stays | Deselect it afterwards only if it should not be in world (Phase 2.9) |
 | 10 | `quickshell` is installed | Its GURU ebuild hard-requires `qtbase[vulkan]`; Vulkan cannot be dropped on that host | Leave Vulkan enabled; Contour does not need it (Phase 2.10) |
 | 11 | Old Portage does not support `--binpkg-respect-use` | Step 6/7 fail with an unrecognized option | Upgrade Portage or remove the flag (Phase 2.11) |
@@ -199,13 +200,12 @@ for f in /etc/portage/package.use/contour \
 done
 ```
 
-The script overwrites these paths. Back up any file with real content and merge manually. Put host-specific additions in separate files (for example `contour-extra`) so the next script run does not erase them.
+The script replaces its own snippets in a directory layout (after backing them up) and only appends missing entries when one of the paths is a single file. Back up any file with real content and merge manually. Put host-specific additions in separate files (for example `contour-extra`) so the next script run does not erase them.
 
 ### 1.10 STOP conditions
 
 Do not run the full installer if any of these is true:
 
-- [ ] `package.use`, `package.accept_keywords` or `package.mask` is a single file.
 - [ ] `EMERGE_DEFAULT_OPTS` contains `--usepkgonly` or `--getbinpkgonly`.
 - [ ] `--binpkg-respect-use` is unsupported and Portage has not been upgraded.
 - [ ] `emerge -p gui-apps/contour` fails on keywords, masks or missing GURU.
@@ -218,7 +218,7 @@ Do not run the full installer if any of these is true:
 
 ### 2.1 Convert single-file Portage configuration to directories
 
-The script assumes `/etc/portage/package.use`, `package.accept_keywords` and `package.mask` are directories. If they are files, `mkdir -p` fails and the script exits.
+The script handles both layouts: a missing path is created as a directory, and an existing single file only has the missing entries appended, with a `# managed by install-contour.sh` marker. Converting a single file to a directory is therefore optional and only useful for keeping host-specific snippets separate.
 
 Back up, then convert each single file. Portage treats every regular file in the directory as configuration, so moving the old file into the directory preserves its contents.
 
@@ -240,7 +240,7 @@ Verify Portage still reads the configuration:
 emerge --info >/dev/null && echo "Portage config OK"
 ```
 
-If the host intentionally keeps a single file managed by another tool, do not convert it: instead patch the script to append to that file with markers rather than overwrite it, and rerun `--check-only`.
+If the host intentionally keeps a single file managed by another tool, leave it as is: the script appends only the missing entries with a marker, then rerun `--check-only`.
 
 ### 2.2 Allow source fallback on the binary-first VM
 
@@ -378,9 +378,9 @@ sudo tee /etc/portage/package.mask/contour-version >/dev/null <<'EOF'
 EOF
 ```
 
-### 2.8 Existing configuration is overwritten
+### 2.8 Existing configuration is preserved
 
-The script writes these paths unconditionally:
+In a directory layout the script replaces its own dedicated snippets; in a single-file layout it appends only the missing entries. Back up either layout before the first run. The paths involved are:
 
 - `/etc/portage/package.accept_keywords/contour`
 - `/etc/portage/package.mask/libunicode`
@@ -403,7 +403,7 @@ for f in /etc/portage/package.use/contour \
 done
 ```
 
-Put any host-specific additions in separate files (`contour-extra`, `zz-contour-local`) rather than editing the three paths above, because the next run replaces them.
+Put any host-specific additions in separate files (`contour-extra`, `zz-contour-local`) rather than editing the dedicated snippets, because the next run replaces them in a directory layout.
 
 ### 2.9 World-file hygiene
 

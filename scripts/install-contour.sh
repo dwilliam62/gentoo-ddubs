@@ -40,15 +40,49 @@ done
 
 need_root "$@"
 
-# The three Portage config files below are managed by this script through
-# portage_write_file() from scripts/lib/common.sh: it backs the previous
-# contents up outside /etc/portage and skips the write when nothing changed
-# (docs/fix-contour-plan.md, "What the script does not handle" row 8).
+# Write a managed Portage snippet. A directory layout gets a dedicated file
+# replaced through portage_write_file(), which backs the previous contents up
+# outside /etc/portage and skips the write when nothing changed. A single-file
+# layout only gets the missing entries appended, so a file shared with another
+# tool is never overwritten. A missing path becomes a directory, matching the
+# layout used by the other installers in this repository
+# (docs/fix-contour-plan.md, "What the script does not handle" rows 1 and 8).
+write_portage_entries() {
+  local base="$1" name="$2" header="$3"
+  local content target line
 
-# Managed writes and drift warnings come from scripts/lib/common.sh:
-# portage_write_file() backs up outside /etc/portage and skips unchanged
-# writes, and warn_drift_from_managed() reports host-specific entries the
-# fresh contents would drop (qtbase[vulkan] for gui-apps/quickshell, e.g.).
+  content="$(cat)"
+
+  if [ ! -e "$base" ]; then
+    mkdir -p "$base"
+  fi
+
+  if [ -d "$base" ]; then
+    target="$base/$name"
+    # Reports host-specific entries the fresh contents would drop, such as the
+    # qtbase[vulkan] that gui-apps/quickshell requires.
+    warn_drift_from_managed "$target" "$content"
+    printf '%s\n' "$content" | portage_write_file "$target"
+    return 0
+  fi
+
+  target="$base"
+  log_warn "${base} is a single file; appending missing entries instead of overwriting it."
+  if ! grep -qF -- "$header" "$target" 2>/dev/null; then
+    printf '\n# %s\n' "$header" >> "$target"
+  fi
+  while IFS= read -r line; do
+    case "$line" in
+      '' | '#'*) continue ;;
+    esac
+    if grep -qxF -- "$line" "$target"; then
+      log_info "  already present: ${line}"
+    else
+      printf '%s\n' "$line" >> "$target"
+      log_ok "  appended: ${line}"
+    fi
+  done <<< "$content"
+}
 
 if [ "$CHECK_ONLY" = false ]; then
   step "Step 1: Ensuring eselect-repository is installed..."
@@ -74,34 +108,21 @@ else
 fi
 
 step "Step 3: Configuring package.accept_keywords for Contour and GURU dependencies..."
-mkdir -p /etc/portage/package.accept_keywords
-keywords_file=/etc/portage/package.accept_keywords/contour
-keywords_content=$(cat << 'EOF'
+write_portage_entries /etc/portage/package.accept_keywords contour "managed by install-contour.sh" << 'EOF'
 gui-apps/contour ~amd64
 media-libs/libunicode ~amd64
 dev-cpp/boxed-cpp ~amd64
 dev-cpp/reflection-cpp ~amd64
 EOF
-)
-warn_drift_from_managed "$keywords_file" "$keywords_content"
-printf '%s\n' "$keywords_content" | portage_write_file "$keywords_file"
 
 step "Step 4: Masking libunicode >= 0.8.0 (fixes Contour 0.6.1 'breakable' build error)..."
-mask_dir="/etc/portage/package.mask"
-mkdir -p "$mask_dir"
-mask_file="${mask_dir}/libunicode"
-mask_content=$(cat << 'EOF'
+write_portage_entries /etc/portage/package.mask libunicode "managed by install-contour.sh" << 'EOF'
 # Contour 0.6.1 is incompatible with libunicode-0.8.0+ due to grapheme_segmenter API change
 >=media-libs/libunicode-0.8.0
 EOF
-)
-warn_drift_from_managed "$mask_file" "$mask_content"
-printf '%s\n' "$mask_content" | portage_write_file "$mask_file"
 
 step "Step 5: Configuring USE flags for Qt and Contour dependencies..."
-mkdir -p /etc/portage/package.use
-use_file=/etc/portage/package.use/contour
-use_content=$(cat << 'EOF'
+write_portage_entries /etc/portage/package.use contour "managed by install-contour.sh" << 'EOF'
 # Contour's ebuild requires qtbase[opengl] and links the C++ Qt6::Multimedia API.
 # qtdeclarative and qtmultimedia carry "opengl=" USE dependencies on qtbase, so
 # they must match. Contour uses no Multimedia/Qt5Compat QML modules, so those
@@ -119,9 +140,6 @@ dev-qt/qtdeclarative opengl
 dev-qt/qtmultimedia opengl
 sys-libs/zlib minizip
 EOF
-)
-warn_drift_from_managed "$use_file" "$use_content"
-printf '%s\n' "$use_content" | portage_write_file "$use_file"
 
 # Report flags that other Portage configuration forces back on. This file
 # deliberately omits qml and vulkan, but global USE or other package.use
