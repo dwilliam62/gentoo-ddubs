@@ -40,12 +40,44 @@ done
 
 need_root "$@"
 
+# The three Portage config files below are managed by this script. Back up any
+# previous version before replacing it so host-specific lines can be recovered
+# (docs/fix-contour-plan.md, "What the script does not handle" row 8).
+# Backups are written outside /etc/portage on purpose: Portage reads every
+# regular file inside package.* directories, so a *.bak file left next to the
+# original would silently become live configuration.
+BACKUP_DIR="${CONTOUR_BACKUP_DIR:-/root/portage-contour-backups}"
+backup_conf() {
+  local path="$1" stamp dest
+  [ -e "$path" ] || return 0
+  stamp=$(date +%Y%m%d-%H%M%S)
+  install -d -m 0700 "$BACKUP_DIR"
+  dest="${BACKUP_DIR}/$(basename -- "$(dirname -- "$path")")-$(basename -- "$path").bak-${stamp}"
+  cp -a "$path" "$dest"
+  log_warn "Backed up ${path} -> ${dest}"
+}
+
+# Replace a managed config file from stdin, skipping the write (and the backup)
+# when the existing contents already match.
+write_conf() {
+  local path="$1" content
+  content=$(cat)
+  if [ -f "$path" ] && [ "$(cat "$path")" = "$content" ]; then
+    log_info "${path} is already up to date; leaving it untouched."
+    return 0
+  fi
+  backup_conf "$path"
+  printf '%s\n' "$content" > "$path"
+}
+
 if [ "$CHECK_ONLY" = false ]; then
   step "Step 1: Ensuring eselect-repository is installed..."
   # eselect-repository is an eselect module, not a standalone binary, so probe the
   # module through eselect itself instead of looking for a command of that name.
   if ! have eselect || ! eselect repository list >/dev/null 2>&1; then
-    emerge --noreplace app-eselect/eselect-repository ||
+    # --oneshot: this is a tool the script needs, not something the user asked
+    # to select into @world (docs/fix-contour-plan.md, row 9).
+    emerge --oneshot --noreplace app-eselect/eselect-repository ||
       die "Failed to install app-eselect/eselect-repository."
   fi
 
@@ -63,7 +95,7 @@ fi
 
 step "Step 3: Configuring package.accept_keywords for Contour and GURU dependencies..."
 mkdir -p /etc/portage/package.accept_keywords
-cat << 'EOF' > /etc/portage/package.accept_keywords/contour
+write_conf /etc/portage/package.accept_keywords/contour << 'EOF'
 gui-apps/contour ~amd64
 media-libs/libunicode ~amd64
 dev-cpp/boxed-cpp ~amd64
@@ -73,14 +105,14 @@ EOF
 step "Step 4: Masking libunicode >= 0.8.0 (fixes Contour 0.6.1 'breakable' build error)..."
 mask_dir="/etc/portage/package.mask"
 mkdir -p "$mask_dir"
-cat << 'EOF' > "${mask_dir}/libunicode"
+write_conf "${mask_dir}/libunicode" << 'EOF'
 # Contour 0.6.1 is incompatible with libunicode-0.8.0+ due to grapheme_segmenter API change
 >=media-libs/libunicode-0.8.0
 EOF
 
 step "Step 5: Configuring USE flags for Qt and Contour dependencies..."
 mkdir -p /etc/portage/package.use
-cat << 'EOF' > /etc/portage/package.use/contour
+write_conf /etc/portage/package.use/contour << 'EOF'
 # Contour's ebuild requires qtbase[opengl] and links the C++ Qt6::Multimedia API.
 # qtdeclarative and qtmultimedia carry "opengl=" USE dependencies on qtbase, so
 # they must match. Contour uses no Multimedia/Qt5Compat QML modules, so those
