@@ -243,7 +243,8 @@ status_yazi() {
 ensure_guru_repo() {
   if ! command -v eselect >/dev/null 2>&1; then
     say "Installing app-eselect/eselect-repository for guru overlay management..."
-    emerge --ask=n app-eselect/eselect-repository ||
+    # --oneshot: overlay tooling, not something to select into @world.
+    emerge --ask=n --oneshot app-eselect/eselect-repository ||
       say "WARN: Failed to install eselect-repository; using a repos.conf entry instead."
   fi
 
@@ -255,7 +256,9 @@ ensure_guru_repo() {
   else
     say "Creating fallback repos.conf entry for guru overlay..."
     install -d /etc/portage/repos.conf
-    cat >"$GURU_REPO_CONF" <<EOF
+    # portage_write_file backs up an existing repos.conf entry outside
+    # /etc/portage before replacing it, and skips identical contents.
+    portage_write_file "$GURU_REPO_CONF" <<EOF
 [guru]
 location = /var/db/repos/guru
 sync-type = git

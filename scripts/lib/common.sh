@@ -186,3 +186,35 @@ version_ge() {
   fi
   [ "$(printf '%s\n%s\n' "$required" "$actual" | sort -V | head -n 1)" = "$required" ]
 }
+
+# ----------------------------------------------------------------------------
+# Portage config files
+# ----------------------------------------------------------------------------
+
+# Backups are kept outside /etc/portage on purpose: Portage reads every regular
+# file inside a package.* directory, so a "foo.bak-<stamp>" file left next to
+# the original would silently become live configuration. Override the location
+# with PORTAGE_BACKUP_DIR.
+portage_backup_file() {
+  local path="$1" dir stamp dest
+  [ -e "$path" ] || return 0
+  dir="${PORTAGE_BACKUP_DIR:-/root/portage-backups}"
+  stamp=$(date +%Y%m%d-%H%M%S)
+  install -d -m 0700 "$dir"
+  dest="${dir}/$(basename -- "$(dirname -- "$path")")-$(basename -- "$path").bak-${stamp}"
+  cp -a "$path" "$dest"
+  log_warn "Backed up ${path} -> ${dest}"
+}
+
+# Replace a managed Portage config file from stdin. Skips the write (and the
+# backup) when the existing contents already match.
+portage_write_file() {
+  local path="$1" content
+  content=$(cat)
+  if [ -f "$path" ] && [ "$(cat "$path")" = "$content" ]; then
+    log_info "${path} is already up to date; leaving it untouched."
+    return 0
+  fi
+  portage_backup_file "$path"
+  printf '%s\n' "$content" > "$path"
+}

@@ -28,7 +28,8 @@ setup_edgets_repository() {
   # sure the install actually produced a usable eselect afterwards.
   if ! have eselect || ! eselect repository list >/dev/null 2>&1; then
     log_info "eselect-repository not usable. Installing app-eselect/eselect-repository..."
-    if ! sudo emerge --ask app-eselect/eselect-repository; then
+    # --oneshot: overlay tooling, not something to select into @world.
+    if ! sudo emerge --ask --oneshot app-eselect/eselect-repository; then
       log_err "Failed to install eselect-repository"
       return 1
     fi

@@ -40,34 +40,41 @@ done
 
 need_root "$@"
 
-# The three Portage config files below are managed by this script. Back up any
-# previous version before replacing it so host-specific lines can be recovered
+# The three Portage config files below are managed by this script through
+# portage_write_file() from scripts/lib/common.sh: it backs the previous
+# contents up outside /etc/portage and skips the write when nothing changed
 # (docs/fix-contour-plan.md, "What the script does not handle" row 8).
-# Backups are written outside /etc/portage on purpose: Portage reads every
-# regular file inside package.* directories, so a *.bak file left next to the
-# original would silently become live configuration.
-BACKUP_DIR="${CONTOUR_BACKUP_DIR:-/root/portage-contour-backups}"
-backup_conf() {
-  local path="$1" stamp dest
-  [ -e "$path" ] || return 0
-  stamp=$(date +%Y%m%d-%H%M%S)
-  install -d -m 0700 "$BACKUP_DIR"
-  dest="${BACKUP_DIR}/$(basename -- "$(dirname -- "$path")")-$(basename -- "$path").bak-${stamp}"
-  cp -a "$path" "$dest"
-  log_warn "Backed up ${path} -> ${dest}"
-}
 
-# Replace a managed config file from stdin, skipping the write (and the backup)
-# when the existing contents already match.
-write_conf() {
-  local path="$1" content
-  content=$(cat)
-  if [ -f "$path" ] && [ "$(cat "$path")" = "$content" ]; then
-    log_info "${path} is already up to date; leaving it untouched."
+# Warn when an existing managed package.use file sets Qt flags the fresh
+# contents drop. Host-specific requirements (qtbase[vulkan] for an installed
+# gui-apps/quickshell, for example) otherwise disappear on the next emerge.
+warn_dropped_qt_flags() {
+  local path="$1" atom flag
+  local dropped=()
+  [ -f "$path" ] || return 0
+  while read -r atom flag; do
+    # Negations ("-vulkan") and USE resets ("-*") are not flags to preserve.
+    case "$flag" in -*) continue ;; esac
+    atom="${atom%%:*}"
+    if printf '%s\n' \
+      "dev-qt/qtbase:opengl" \
+      "dev-qt/qtdeclarative:opengl" \
+      "dev-qt/qtmultimedia:opengl" |
+      grep -qxF "${atom}:${flag}"; then
+      continue
+    fi
+    dropped+=("${atom} ${flag}")
+  done < <(
+    sed 's/#.*//' "$path" |
+      grep -E '^[[:space:]]*dev-qt/(qtbase|qtdeclarative|qtmultimedia)([[:space:]]|:)' |
+      awk '{ for (i = 2; i <= NF; i++) print $1, $i }'
+  )
+  if [ "${#dropped[@]}" -eq 0 ]; then
     return 0
   fi
-  backup_conf "$path"
-  printf '%s\n' "$content" > "$path"
+  log_warn "Existing ${path} sets Qt flags this script does not write:"
+  printf '    %s\n' "${dropped[@]}" >&2
+  log_warn "Host-specific flags belong in a separate file (for example package.use/contour-extra); a rerun would drop them here."
 }
 
 if [ "$CHECK_ONLY" = false ]; then
@@ -95,7 +102,7 @@ fi
 
 step "Step 3: Configuring package.accept_keywords for Contour and GURU dependencies..."
 mkdir -p /etc/portage/package.accept_keywords
-write_conf /etc/portage/package.accept_keywords/contour << 'EOF'
+portage_write_file /etc/portage/package.accept_keywords/contour << 'EOF'
 gui-apps/contour ~amd64
 media-libs/libunicode ~amd64
 dev-cpp/boxed-cpp ~amd64
@@ -105,14 +112,15 @@ EOF
 step "Step 4: Masking libunicode >= 0.8.0 (fixes Contour 0.6.1 'breakable' build error)..."
 mask_dir="/etc/portage/package.mask"
 mkdir -p "$mask_dir"
-write_conf "${mask_dir}/libunicode" << 'EOF'
+portage_write_file "${mask_dir}/libunicode" << 'EOF'
 # Contour 0.6.1 is incompatible with libunicode-0.8.0+ due to grapheme_segmenter API change
 >=media-libs/libunicode-0.8.0
 EOF
 
 step "Step 5: Configuring USE flags for Qt and Contour dependencies..."
 mkdir -p /etc/portage/package.use
-write_conf /etc/portage/package.use/contour << 'EOF'
+warn_dropped_qt_flags /etc/portage/package.use/contour
+portage_write_file /etc/portage/package.use/contour << 'EOF'
 # Contour's ebuild requires qtbase[opengl] and links the C++ Qt6::Multimedia API.
 # qtdeclarative and qtmultimedia carry "opengl=" USE dependencies on qtbase, so
 # they must match. Contour uses no Multimedia/Qt5Compat QML modules, so those

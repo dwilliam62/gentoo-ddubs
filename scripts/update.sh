@@ -78,7 +78,8 @@ ensure_hyproverlay_repo() {
 
   if ! eselect repository list >/dev/null 2>&1; then
     say "Installing app-eselect/eselect-repository..."
-    emerge -n app-eselect/eselect-repository || {
+    # --oneshot: overlay tooling, not something to select into @world.
+    emerge -n --oneshot app-eselect/eselect-repository || {
       say "WARN: Failed to install app-eselect/eselect-repository; cannot manage hyproverlay automatically."
       return
     }

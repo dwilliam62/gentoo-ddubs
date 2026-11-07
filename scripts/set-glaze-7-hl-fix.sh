@@ -144,6 +144,21 @@ is_glaze8_masked() {
     || grep -rqs "dev-cpp/glaze:8" /etc/portage/package.mask 2>/dev/null
 }
 
+# Write the mask through the shared helper: an existing mask file is backed up
+# outside /etc/portage (Portage reads every regular file in package.mask/), and
+# an identical file is left untouched.
+write_glaze_mask() {
+  mkdir -p "$(dirname "$MASK_FILE")"
+  portage_write_file "$MASK_FILE" <<'EOF'
+# Mask dev-cpp/glaze 8.x:
+# Hyprland 0.56.x CMake strictly requires glaze version 7...<8.
+# Glaze 8 causes CMake FetchContent to attempt network downloads during emerge.
+>=dev-cpp/glaze-8
+EOF
+  log_ok "Created $MASK_FILE with rule: '>=dev-cpp/glaze-8'"
+  STATUS_MASK="APPLIED"
+}
+
 # Status tracking
 STATUS_MASK="NOT_CHECKED"
 STATUS_GLAZE_PKG="NOT_CHECKED"
@@ -231,15 +246,7 @@ if [ "$MASK_GLAZE_ONLY" = true ]; then
   if [ "$STATUS_MASK" = "ALREADY_ACTIVE" ]; then
     log_ok "Portage mask for >=dev-cpp/glaze-8 is already active ($MASK_FILE)"
   else
-    mkdir -p "$(dirname "$MASK_FILE")"
-    cat <<'EOF' >"$MASK_FILE"
-# Mask dev-cpp/glaze 8.x:
-# Hyprland 0.56.x CMake strictly requires glaze version 7...<8.
-# Glaze 8 causes CMake FetchContent to attempt network downloads during emerge.
->=dev-cpp/glaze-8
-EOF
-    log_ok "Created $MASK_FILE with rule: '>=dev-cpp/glaze-8'"
-    STATUS_MASK="APPLIED"
+    write_glaze_mask
   fi
   printf "\n%b[DONE] Exiting as requested by --mask-glaze.%b\n\n" "${GREEN}" "${RESET}"
   exit 0
@@ -276,15 +283,7 @@ if [ "$DO_APPLY_MASK" = true ]; then
   if [ "$STATUS_MASK" = "ALREADY_ACTIVE" ]; then
     log_ok "Mask is already active; no modification needed."
   else
-    mkdir -p "$(dirname "$MASK_FILE")"
-    cat <<'EOF' >"$MASK_FILE"
-# Mask dev-cpp/glaze 8.x:
-# Hyprland 0.56.x CMake strictly requires glaze version 7...<8.
-# Glaze 8 causes CMake FetchContent to attempt network downloads during emerge.
->=dev-cpp/glaze-8
-EOF
-    log_ok "Created $MASK_FILE with rule: '>=dev-cpp/glaze-8'"
-    STATUS_MASK="APPLIED"
+    write_glaze_mask
   fi
 
   # Step 2: Ensure dev-cpp/glaze 7.x is installed

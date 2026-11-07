@@ -34,6 +34,13 @@ All notable changes to this project will be documented in this file.
   - Suppressed Portage's "binary packages have been ignored due to non matching USE" warning with `--binpkg-respect-use=y` on every emerge
   - Step 6 now uses `--oneshot` so the Qt dependencies stay out of `@world`; `@world` keeps only `gui-apps/contour`
   - Added non-fatal warnings when global `USE` or another `package.use` file turns `qml`/`vulkan` back on, followed by the effective per-package flags from `equery uses`
+- Followed `docs/fix-contour-plan.md` on the source host and fixed what it exposed
+  - Added `portage_backup_file`/`portage_write_file` to `scripts/lib/common.sh` (`PORTAGE_BACKUP_DIR`, default `/root/portage-backups`): the previous contents are backed up outside `/etc/portage` and unchanged files are not rewritten, because Portage reads every regular file inside `package.*` directories and a `*.bak` left in place becomes live configuration
+  - `install-contour.sh` writes its three managed files through that helper, so a rerun no longer silently discards hand-added flags
+  - `install-contour.sh` warns when an existing `package.use/contour` sets Qt flags the new contents would drop (the `qtbase[vulkan]` that installed `gui-apps/quickshell` requires, for example), pointing at `package.use/contour-extra`
+  - `install-contour.sh`, `update.sh`, `update-yazi.sh`, `install-hyprmod.sh`: `app-eselect/eselect-repository` is installed with `--oneshot` and stays out of `@world`
+  - `set-glaze-7-hl-fix.sh` and `update-yazi.sh` no longer truncate an existing mask file or `repos.conf` entry in place
+  - `docs/fix-contour-plan.md`: the Phase 2.8 backup recipe copies outside `/etc/portage`; rows 8 and 9 match the script's backup and `--oneshot` behaviour
 
 ## Oct 2026
 

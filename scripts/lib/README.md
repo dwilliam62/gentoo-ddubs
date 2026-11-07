@@ -43,3 +43,14 @@ Colour is disabled automatically when stdout is not a terminal, when
 | `portage_conf_file /etc/portage/package.mask foo` | `.../package.mask/foo` when that path is a directory, otherwise the file itself |
 | `pkg_installed atom` | installed check via `qlist`, falling back to `portageq` |
 | `version_ge actual required` | `sort -V` version comparison |
+| `portage_backup_file /etc/portage/package.use/foo` | copies an existing config file to `${PORTAGE_BACKUP_DIR:-/root/portage-backups}` |
+| `portage_write_file /etc/portage/package.use/foo <<'EOF' ... EOF` | replaces a config file from stdin, backing up the old contents first and skipping the write when they already match |
+
+`portage_write_file` is the way to rewrite a file the script owns: a rerun with
+identical contents leaves the file alone, and a changed file is preserved first.
+Backups deliberately live **outside** `/etc/portage` (default
+`/root/portage-backups`, override with `PORTAGE_BACKUP_DIR`) because Portage
+reads every regular file inside a `package.*` directory — a
+`foo.bak-<stamp>` left next to the original would become live configuration.
+Host-specific additions therefore belong in a separate snippet (for example
+`package.use/contour-extra`), not in the file a script manages.

@@ -26,10 +26,12 @@ The script fixes the issues found on that host, but it is **not a universal fix*
 - Uses `--binpkg-respect-use=y` so binpkgs with non-matching USE are ignored instead of producing the “binary packages have been ignored” warning block.
 - Uses `--oneshot` on the Qt rebuild so those dependencies are not added to `@world`.
 - Uses `--oneshot` when it has to install `app-eselect/eselect-repository`, for the same reason.
-- Backs up a managed config file to `/root/portage-contour-backups` (override with
-  `CONTOUR_BACKUP_DIR`) before replacing it, and leaves it untouched when the contents
+- Backs up a managed config file to `/root/portage-backups` (override with
+  `PORTAGE_BACKUP_DIR`) before replacing it, and leaves it untouched when the contents
   already match. Backups live outside `/etc/portage` so Portage never reads them as
   configuration.
+- Warns when an existing `package.use/contour` sets Qt flags the new contents drop, and
+  points at a separate file (`package.use/contour-extra`) for host-specific flags.
 - Warns when global USE or another `package.use` file re-enables `qml`/`vulkan`, and prints the effective flags from `equery uses`.
 - Provides `--check-only`, which writes the Portage configuration, skips overlay setup (Steps 1–2), and previews both emerge commands with `--pretend`.
 
@@ -44,7 +46,7 @@ The script fixes the issues found on that host, but it is **not a universal fix*
 | 5 | No OpenGL 3.3 driver (common in minimal VMs) | Contour cannot create its rendering context | Install/configure Mesa or enable software rendering (Phase 2.6) |
 | 6 | `virtual/minizip` is not installed | `sys-libs/zlib minizip` forces an unnecessary zlib rebuild | Optional: drop that line on this host (Phase 2.4) |
 | 7 | GURU is unavailable/offline or has a newer Contour | Script warns but continues; a newer version may not need the libunicode mask | Verify GURU and the ebuild version before the full run (Phase 2.7) |
-| 8 | Existing files at the three script-written paths | The script replaces them, but now backs the old contents up to `/root/portage-contour-backups` first (and skips the write when nothing changed) | Move host-specific lines into a separate file such as `package.use/contour-extra` so a rerun cannot drop them (Phase 2.8) |
+| 8 | Existing files at the three script-written paths | The script replaces them, but now backs the old contents up to `/root/portage-backups` first (and skips the write when nothing changed) | Move host-specific lines into a separate file such as `package.use/contour-extra` so a rerun cannot drop them (Phase 2.8) |
 | 9 | `app-eselect/eselect-repository` is newly installed by Step 1 | The script passes `--oneshot`, so it is not added to `@world`; an entry selected by an earlier run stays | Deselect it afterwards only if it should not be in world (Phase 2.9) |
 | 10 | `quickshell` is installed | Its GURU ebuild hard-requires `qtbase[vulkan]`; Vulkan cannot be dropped on that host | Leave Vulkan enabled; Contour does not need it (Phase 2.10) |
 | 11 | Old Portage does not support `--binpkg-respect-use` | Step 6/7 fail with an unrecognized option | Upgrade Portage or remove the flag (Phase 2.11) |
@@ -386,8 +388,8 @@ The script writes these paths unconditionally:
 Back them up before the first run. Copy the backups **outside** `/etc/portage`:
 Portage reads every regular file inside a `package.*` directory, so a
 `contour.bak-<ts>` file left next to the original silently becomes live
-configuration. The script itself backs up to `/root/portage-contour-backups`
-(override with `CONTOUR_BACKUP_DIR`) and only when it actually changes a file.
+configuration. The script itself backs up to `/root/portage-backups`
+(override with `PORTAGE_BACKUP_DIR`) and only when it actually changes a file.
 
 ```bash
 ts=$(date +%Y%m%d-%H%M%S)
