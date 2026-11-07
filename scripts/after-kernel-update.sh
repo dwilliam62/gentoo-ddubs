@@ -11,17 +11,63 @@ SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 # Keep the historical [after-kernel-update] tag on every line.
 log() { log_info "[after-kernel-update] $*"; }
 warn() { log_warn "[after-kernel-update] $*"; }
+CHECK_ONLY=false
+CHECK_FAILURES=0
 fail() {
+  # In check mode a failed condition is reported and counted instead of
+  # aborting, so one run can list every problem.
+  if [ "$CHECK_ONLY" = true ]; then
+    log_err "[after-kernel-update] CHECK FAILED: $*"
+    CHECK_FAILURES=$((CHECK_FAILURES + 1))
+    return 0
+  fi
   log_err "[after-kernel-update] ERROR: $*"
   exit 1
 }
+
+print_usage() {
+  cat <<'EOF'
+Usage: after-kernel-update.sh [--check]
+
+  -c, --check, --dry-run  Report what a run would prune, verify the newest
+                          kernel artifacts and the GRUB reference, and exit
+                          non-zero if anything is wrong. Changes nothing and
+                          does not require root.
+  -h, --help              Show this help and exit.
+EOF
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    -c | --check | --dry-run) CHECK_ONLY=true ;;
+    -h | --help)
+      print_usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown argument: %s\n\n' "$arg" >&2
+      print_usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+# installkernel may write kernel-<ver> or vmlinuz-<ver>; both are supported.
+kernel_image_paths() {
+  find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -printf '%p\n' 2>/dev/null \
+    | sort -V
+}
+
+kernel_version_from_path() {
+  basename -- "$1" | sed -E 's/^(kernel|vmlinuz)-//'
+}
+
 prune_kernels_missing_modules() {
   local running_version version
   running_version="$(uname -r)"
 
   while IFS= read -r kernel_path; do
-    # installkernel may write either kernel-<ver> or vmlinuz-<ver>.
-    version="$(basename -- "$kernel_path" | sed -E 's/^(kernel|vmlinuz)-//')"
+    version="$(kernel_version_from_path "$kernel_path")"
     [ -n "$version" ] || continue
 
     if [ "$version" = "$running_version" ]; then
@@ -32,11 +78,13 @@ prune_kernels_missing_modules() {
       log "Removing kernel ${version} from /boot (missing /lib/modules/${version})..."
       rm -f "/boot/kernel-${version}" "/boot/vmlinuz-${version}" "/boot/initramfs-${version}.img"
     fi
-  done < <(find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -printf '%p\n' | sort -V)
+  done < <(kernel_image_paths)
 }
 latest_boot_kernel_version() {
-  find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -printf '%f\n' 2>/dev/null \
-    | sed -E 's/^(kernel|vmlinuz)-//' \
+  local image
+  while IFS= read -r image; do
+    kernel_version_from_path "$image"
+  done < <(kernel_image_paths) \
     | sort -V \
     | tail -n 1
 }
@@ -44,6 +92,9 @@ latest_boot_kernel_version() {
 verify_latest_kernel_artifacts() {
   local latest="$1"
   [[ -n "$latest" ]] || fail "No kernel images (kernel-* or vmlinuz-*) found in /boot after cleanup."
+  # In check mode fail() returns, so stop here instead of reporting follow-on
+  # misses that exist only because there is no version to test.
+  [ -n "$latest" ] || return 0
 
   if [[ ! -f "/boot/kernel-${latest}" && ! -f "/boot/vmlinuz-${latest}" ]]; then
     fail "Missing /boot/kernel-${latest} or /boot/vmlinuz-${latest}"
@@ -88,12 +139,16 @@ verify_grub_cfg_contains_latest() {
   fi
 }
 
-if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
+if [[ ${EUID:-$(id -u)} -ne 0 ]] && [ "$CHECK_ONLY" = false ]; then
   fail "must be run as root"
 fi
 
 if ! command -v eclean-kernel >/dev/null 2>&1; then
-  fail "eclean-kernel not found in PATH (install app-admin/eclean-kernel)"
+  if [ "$CHECK_ONLY" = true ]; then
+    warn "eclean-kernel not found in PATH; a real run would fail until app-admin/eclean-kernel is installed."
+  else
+    fail "eclean-kernel not found in PATH (install app-admin/eclean-kernel)"
+  fi
 fi
 KEEP_KERNELS="${KEEP_KERNELS:-2}"
 
@@ -131,6 +186,64 @@ detect_eclean_layout() {
 }
 
 eclean_layout="$(detect_eclean_layout)"
+
+if [ "$CHECK_ONLY" = true ]; then
+  step "Check mode: reporting only (nothing is pruned or regenerated)"
+  # /boot is commonly 0700 root, so a non-root check cannot see the images.
+  if [ ! -r /boot ]; then
+    log_err "[after-kernel-update] Cannot read /boot as $(id -un); re-run with sudo to check kernel artifacts."
+    exit 2
+  fi
+  log "Running kernel:   $(uname -r)"
+  log "eclean layout:    ${eclean_layout}"
+  log "Kernels to keep:  ${KEEP_KERNELS}"
+
+  if kernel_image_paths | grep -q .; then
+    log "Kernel images in /boot (image -> parsed version):"
+    while IFS= read -r image; do
+      printf '    %s -> %s\n' "$(basename -- "$image")" "$(kernel_version_from_path "$image")"
+    done < <(kernel_image_paths)
+  else
+    warn "No kernel-*/vmlinuz-* images found in /boot."
+  fi
+
+  # The decisions prune_kernels_missing_modules() would take, without deleting.
+  while IFS= read -r image; do
+    version="$(kernel_version_from_path "$image")"
+    [ -n "$version" ] || continue
+    [ "$version" = "$(uname -r)" ] && continue
+    if [ ! -d "/lib/modules/${version}" ]; then
+      warn "Would remove $(basename -- "$image") (missing /lib/modules/${version})"
+    fi
+  done < <(kernel_image_paths)
+
+  latest_kernel="$(latest_boot_kernel_version)"
+  log "Newest kernel:    ${latest_kernel:-none}"
+  verify_latest_kernel_artifacts "$latest_kernel"
+
+  current_target="$(readlink /usr/src/linux 2>/dev/null || true)"
+  if [[ -n "$latest_kernel" && -d "/usr/src/linux-${latest_kernel}" ]] &&
+    [[ "$current_target" != "linux-${latest_kernel}" && "$current_target" != "/usr/src/linux-${latest_kernel}" ]]; then
+    warn "Would repoint /usr/src/linux to linux-${latest_kernel} (currently ${current_target:-unset})"
+  fi
+
+  if [ "$eclean_layout" = "blspec" ]; then
+    log "BLS layout: no GRUB config to verify."
+  elif [[ -f /boot/grub/grub.cfg ]]; then
+    verify_grub_cfg_contains_latest "$latest_kernel"
+  else
+    warn "Missing /boot/grub/grub.cfg; a real run would regenerate it."
+  fi
+
+  printf '\n'
+  if [ "$CHECK_FAILURES" -eq 0 ]; then
+    log "Check complete: no problems found."
+    exit 0
+  fi
+  log_err "[after-kernel-update] Check complete with ${CHECK_FAILURES} problem(s)."
+  exit 1
+fi
+
 prune_kernels_missing_modules
 
 log "Pruning old kernels (keeping ${KEEP_KERNELS}, layout=${eclean_layout})..."

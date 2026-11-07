@@ -36,6 +36,8 @@ All notable changes to this project will be documented in this file.
   - Added non-fatal warnings when global `USE` or another `package.use` file turns `qml`/`vulkan` back on, followed by the effective per-package flags from `equery uses`
 - Finished the remaining review findings
   - `after-kernel-update.sh` handles `vmlinuz-*` images as well as `kernel-*` when pruning, detecting the newest kernel, verifying artifacts and checking `grub.cfg` (exact image names only, not a loose `-<version>` match)
+  - `after-kernel-update.sh` gained `--check`/`--dry-run`: it lists the /boot images it recognises, the prune decisions, the newest-kernel artifacts and the GRUB reference, changes nothing, and exits non-zero on problems. `/boot` is usually `0700 root`, so such hosts need `sudo` even for the check
+  - `gentoo-install-hyprland.sh`: the truncating Portage writes (hyproverlay and gentoo `repos.conf`, `package.use/hyprland-qt`, `package.use/libdrm-gpu-cards`, `/etc/portage/env/cxx17-fix`, the Discord `package.license` entry) go through a `write_portage_file` wrapper that reports entries they would drop
   - `scripts/lib/common.sh`: `warn_drift_from_managed <path> <content>` reports host-specific entries a managed write would drop; `install-contour.sh`, `set-glaze-7-hl-fix.sh` and `update-yazi.sh` now call it before replacing a file
   - `gentoo-install-hyprland.sh`: added `ensure_overlay_keywords` with explicit per-atom `~amd64` entries instead of blanket `*/*::<overlay>` lines (an existing blanket entry is respected, so nothing is appended), plus `dev-qt/qt5compat icu qml`, `dev-cpp/cpptrace unwind`, the Python 3.13 target block and `media-plugins/alsa-plugins`
 - Followed `docs/fix-contour-plan.md` on the source host and fixed what it exposed

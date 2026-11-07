@@ -225,7 +225,8 @@ portage_write_file() {
 #   warn_drift_from_managed "$path" "$content"
 warn_drift_from_managed() {
   local path="$1" content="$2" line extra=()
-  [ -f "$path" ] || return 0
+  # Unreadable files are skipped: the caller's write reports its own errors.
+  [ -r "$path" ] || return 0
   while IFS= read -r line; do
     line=${line%%#*}
     line=$(printf '%s\n' "$line" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//')

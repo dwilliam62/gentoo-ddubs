@@ -124,13 +124,16 @@ ensure_hyproverlay_repo() {
   else
     echo "[INFO] Adding hyproverlay repo config file (fallback path)..."
     sudo mkdir -p /etc/portage/repos.conf
-    sudo tee "${HYPROVERLAY_REPO_CONF}" >/dev/null <<EOF
+    local hyproverlay_conf
+    hyproverlay_conf=$(cat <<EOF
 [hyproverlay]
 location = /var/db/repos/hyproverlay
 sync-type = git
 sync-uri = ${HYPROVERLAY_SYNC_URI}
 auto-sync = yes
 EOF
+)
+    write_portage_file "${HYPROVERLAY_REPO_CONF}" "$hyproverlay_conf"
   fi
 
   if command -v emaint >/dev/null 2>&1; then
@@ -162,8 +165,9 @@ fi
 ensure_use_flags() {
   echo "[INFO] Ensuring required USE flags for qtbase, libxkbcommon, gtkmm, gtk+, cairo/mesa"
   local use_file="/etc/portage/package.use/hyprland-qt"
+  local use_content
   sudo mkdir -p /etc/portage/package.use
-  sudo tee "$use_file" >/dev/null <<'EOF'
+  use_content=$(cat <<'EOF'
 >=dev-qt/qtbase-6.10.1 wayland opengl icu
 dev-qt/qtwayland wayland opengl
 # quickshell links the Qt5Compat QML modules
@@ -222,6 +226,15 @@ dev-python/screeninfo python_targets_python3_13
 # mpv/vlc dependency
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
+)
+  write_portage_file "$use_file" "$use_content"
+}
+
+# Replace a script-managed Portage file, reporting entries it would drop first.
+write_portage_file() {
+  local file="$1" content="$2"
+  warn_drift_from_managed "$file" "$content"
+  printf '%s\n' "$content" | sudo tee "$file" >/dev/null
 }
 
 # Explicit per-atom keywords: the overlay packages this installer selects are
@@ -324,7 +337,7 @@ ensure_video_cards() {
   fi
   if printf ' %s ' "$cards" | grep -qE ' (amdgpu|radeonsi) '; then
     sudo mkdir -p /etc/portage/package.use
-    echo '>=x11-libs/libdrm-2.4.134 video_cards_radeon' | sudo tee "$libdrm_use_file" >/dev/null
+    write_portage_file "$libdrm_use_file" '>=x11-libs/libdrm-2.4.134 video_cards_radeon'
     echo "[OK] Added AMD libdrm USE compatibility: $libdrm_use_file"
   elif [[ -f "$libdrm_use_file" ]]; then
     sudo rm -f "$libdrm_use_file"
@@ -545,14 +558,17 @@ ensure_gentoo_rsync_repo() {
   local repo_conf_dir="/etc/portage/repos.conf"
   local gentoo_conf="${repo_conf_dir}/gentoo.conf"
 
+  local gentoo_conf_content
   sudo mkdir -p "${repo_conf_dir}"
-  sudo tee "${gentoo_conf}" >/dev/null <<'EOF'
+  gentoo_conf_content=$(cat <<'EOF'
 [gentoo]
 location = /var/db/repos/gentoo
 sync-type = rsync
 sync-uri = rsync://rsync.gentoo.org/gentoo-portage
 auto-sync = yes
 EOF
+)
+  write_portage_file "${gentoo_conf}" "$gentoo_conf_content"
 
   if [ -d /var/db/repos/gentoo ]; then
     echo "[INFO] Removing any git metadata from /var/db/repos/gentoo for rsync"
@@ -567,9 +583,12 @@ ensure_pamixer_cxx17_fix() {
   sudo mkdir -p /etc/portage/env
 
   # Write the flag to a dedicated environment file (idempotent overwrite)
-  sudo tee /etc/portage/env/cxx17-fix >/dev/null <<'EOF'
+  local cxx17_content
+  cxx17_content=$(cat <<'EOF'
 CXXFLAGS="${CXXFLAGS} -std=c++17"
 EOF
+)
+  write_portage_file /etc/portage/env/cxx17-fix "$cxx17_content"
 
   # Handle both valid Portage layouts:
   # 1) /etc/portage/package.env as a file
@@ -662,7 +681,7 @@ ensure_discord_license_acceptance() {
     if [[ -f "$package_license_file" ]] && sudo grep -q '^net-im/discord[[:space:]].*all-rights-reserved' "$package_license_file"; then
       echo "[OK] Discord license acceptance already configured."
     else
-      echo "$line" | sudo tee "$package_license_file" >/dev/null
+      write_portage_file "$package_license_file" "$line"
       echo "[OK] Added Discord license acceptance to ${package_license_file}."
     fi
     return 0
