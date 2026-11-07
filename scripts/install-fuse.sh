@@ -23,9 +23,13 @@ modprobe fuse || log_warn "modprobe fuse failed; the module may already be loade
 mkdir -p /etc/modules-load.d
 if grep -qs "^fuse$" /etc/modules-load.d/fuse.conf 2>/dev/null; then
   log_info "'fuse' already listed in /etc/modules-load.d/fuse.conf"
+elif [ -f /etc/modules-load.d/fuse.conf ]; then
+  # Append rather than truncate: the file may list other modules too.
+  echo "fuse" >> /etc/modules-load.d/fuse.conf
+  log_ok "Added 'fuse' to /etc/modules-load.d/fuse.conf"
 else
   echo "fuse" > /etc/modules-load.d/fuse.conf
-  log_ok "Added 'fuse' to /etc/modules-load.d/fuse.conf"
+  log_ok "Created /etc/modules-load.d/fuse.conf with 'fuse'"
 fi
 
 step "Step 2: Installing FUSE 2 (libfuse.so.2), FUSE 3, and squashfs-tools..."

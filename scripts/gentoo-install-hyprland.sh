@@ -783,7 +783,13 @@ ensure_gdk_pixbuf_loaders_cache() {
 ensure_kernel_postinst_efi_update() {
   if command -v efibootmgr >/dev/null 2>&1; then
     if sudo efibootmgr -v 2>/dev/null | grep -qi 'grub'; then
-      echo "[INFO] GRUB-managed EFI detected; skipping EFI copy postinst hook."
+      echo "[INFO] GRUB-managed EFI detected; EFI copy postinst hook not needed."
+      # A hook left over from an EFI-stub install keeps running on every kernel
+      # merge and exits non-zero when /boot/efi is not mounted, so drop it.
+      if [ -e /etc/kernel/postinst.d/99-efi-update.sh ]; then
+        sudo rm -f /etc/kernel/postinst.d/99-efi-update.sh
+        echo "[INFO] Removed stale EFI copy postinst hook (99-efi-update.sh)."
+      fi
       return 0
     fi
   fi
@@ -845,6 +851,14 @@ ensure_kernel_check_report_hook() {
 KVER="\${1:-unknown}"
 CHECK_SCRIPT="${check_script}"
 REPORT_LOG="${report_log}"
+
+# Keep the log bounded without relying on logrotate, which is not installed
+# everywhere: trim to the last 500 lines once it passes 1 MiB. This has to run
+# before the block below opens the log, otherwise the report would be appended
+# to the inode the rename had just replaced.
+if [ -f "\$REPORT_LOG" ] && [ "\$(wc -c <"\$REPORT_LOG")" -gt 1048576 ]; then
+  tail -n 500 "\$REPORT_LOG" > "\$REPORT_LOG.tmp" && mv "\$REPORT_LOG.tmp" "\$REPORT_LOG"
+fi
 
 {
   printf '=== %s kernel %s ===\\n' "\$(date -Is 2>/dev/null || date)" "\$KVER"
