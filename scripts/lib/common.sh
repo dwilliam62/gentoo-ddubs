@@ -218,3 +218,24 @@ portage_write_file() {
   portage_backup_file "$path"
   printf '%s\n' "$content" > "$path"
 }
+
+# Warn when a managed file already holds entries the fresh contents drop. Call
+# this before portage_write_file so host-specific additions are reported
+# instead of vanishing: they belong in a separate "<file>-extra" snippet.
+#   warn_drift_from_managed "$path" "$content"
+warn_drift_from_managed() {
+  local path="$1" content="$2" line extra=()
+  [ -f "$path" ] || return 0
+  while IFS= read -r line; do
+    line=${line%%#*}
+    line=$(printf '%s\n' "$line" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//')
+    [ -n "$line" ] || continue
+    printf '%s\n' "$content" | grep -qxF -- "$line" || extra+=("$line")
+  done <"$path"
+  if [ "${#extra[@]}" -eq 0 ]; then
+    return 0
+  fi
+  log_warn "Existing ${path} has entries this script does not write:"
+  printf '    %s\n' "${extra[@]}" >&2
+  log_warn "Keep host-specific entries in a separate file (for example ${path}-extra); a rerun would drop them here."
+}

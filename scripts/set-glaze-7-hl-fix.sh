@@ -148,13 +148,18 @@ is_glaze8_masked() {
 # outside /etc/portage (Portage reads every regular file in package.mask/), and
 # an identical file is left untouched.
 write_glaze_mask() {
+  local content
   mkdir -p "$(dirname "$MASK_FILE")"
-  portage_write_file "$MASK_FILE" <<'EOF'
+  content=$(cat <<'EOF'
 # Mask dev-cpp/glaze 8.x:
 # Hyprland 0.56.x CMake strictly requires glaze version 7...<8.
 # Glaze 8 causes CMake FetchContent to attempt network downloads during emerge.
 >=dev-cpp/glaze-8
 EOF
+)
+  # Report mask lines this file would drop before replacing it.
+  warn_drift_from_managed "$MASK_FILE" "$content"
+  printf '%s\n' "$content" | portage_write_file "$MASK_FILE"
   log_ok "Created $MASK_FILE with rule: '>=dev-cpp/glaze-8'"
   STATUS_MASK="APPLIED"
 }

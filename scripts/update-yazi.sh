@@ -256,15 +256,19 @@ ensure_guru_repo() {
   else
     say "Creating fallback repos.conf entry for guru overlay..."
     install -d /etc/portage/repos.conf
-    # portage_write_file backs up an existing repos.conf entry outside
-    # /etc/portage before replacing it, and skips identical contents.
-    portage_write_file "$GURU_REPO_CONF" <<EOF
+    local guru_conf
+    guru_conf=$(cat <<EOF
 [guru]
 location = /var/db/repos/guru
 sync-type = git
 sync-uri = ${GURU_SYNC_URI}
 auto-sync = yes
 EOF
+)
+    # portage_write_file backs an existing entry up outside /etc/portage and
+    # skips identical contents; report any host-specific lines it replaces.
+    warn_drift_from_managed "$GURU_REPO_CONF" "$guru_conf"
+    printf '%s\n' "$guru_conf" | portage_write_file "$GURU_REPO_CONF"
   fi
 
   if command -v emaint >/dev/null 2>&1; then

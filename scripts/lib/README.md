@@ -45,6 +45,7 @@ Colour is disabled automatically when stdout is not a terminal, when
 | `version_ge actual required` | `sort -V` version comparison |
 | `portage_backup_file /etc/portage/package.use/foo` | copies an existing config file to `${PORTAGE_BACKUP_DIR:-/root/portage-backups}` |
 | `portage_write_file /etc/portage/package.use/foo <<'EOF' ... EOF` | replaces a config file from stdin, backing up the old contents first and skipping the write when they already match |
+| `warn_drift_from_managed /etc/portage/package.use/foo "$content"` | reports entries the existing file holds that the new contents would drop (call it just before `portage_write_file`) |
 
 `portage_write_file` is the way to rewrite a file the script owns: a rerun with
 identical contents leaves the file alone, and a changed file is preserved first.
@@ -53,4 +54,6 @@ Backups deliberately live **outside** `/etc/portage` (default
 reads every regular file inside a `package.*` directory — a
 `foo.bak-<stamp>` left next to the original would become live configuration.
 Host-specific additions therefore belong in a separate snippet (for example
-`package.use/contour-extra`), not in the file a script manages.
+`package.use/contour-extra`), not in the file a script manages. Pair a managed
+write with `warn_drift_from_managed "$path" "$content"` so the run says which
+of those additions it is about to drop instead of removing them silently.

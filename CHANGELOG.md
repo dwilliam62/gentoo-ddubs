@@ -34,6 +34,10 @@ All notable changes to this project will be documented in this file.
   - Suppressed Portage's "binary packages have been ignored due to non matching USE" warning with `--binpkg-respect-use=y` on every emerge
   - Step 6 now uses `--oneshot` so the Qt dependencies stay out of `@world`; `@world` keeps only `gui-apps/contour`
   - Added non-fatal warnings when global `USE` or another `package.use` file turns `qml`/`vulkan` back on, followed by the effective per-package flags from `equery uses`
+- Finished the remaining review findings
+  - `after-kernel-update.sh` handles `vmlinuz-*` images as well as `kernel-*` when pruning, detecting the newest kernel, verifying artifacts and checking `grub.cfg` (exact image names only, not a loose `-<version>` match)
+  - `scripts/lib/common.sh`: `warn_drift_from_managed <path> <content>` reports host-specific entries a managed write would drop; `install-contour.sh`, `set-glaze-7-hl-fix.sh` and `update-yazi.sh` now call it before replacing a file
+  - `gentoo-install-hyprland.sh`: added `ensure_overlay_keywords` with explicit per-atom `~amd64` entries instead of blanket `*/*::<overlay>` lines (an existing blanket entry is respected, so nothing is appended), plus `dev-qt/qt5compat icu qml`, `dev-cpp/cpptrace unwind`, the Python 3.13 target block and `media-plugins/alsa-plugins`
 - Followed `docs/fix-contour-plan.md` on the source host and fixed what it exposed
   - Added `portage_backup_file`/`portage_write_file` to `scripts/lib/common.sh` (`PORTAGE_BACKUP_DIR`, default `/root/portage-backups`): the previous contents are backed up outside `/etc/portage` and unchanged files are not rewritten, because Portage reads every regular file inside `package.*` directories and a `*.bak` left in place becomes live configuration
   - `install-contour.sh` writes its three managed files through that helper, so a rerun no longer silently discards hand-added flags

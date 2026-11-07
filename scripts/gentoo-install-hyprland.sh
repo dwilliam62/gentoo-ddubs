@@ -166,6 +166,8 @@ ensure_use_flags() {
   sudo tee "$use_file" >/dev/null <<'EOF'
 >=dev-qt/qtbase-6.10.1 wayland opengl icu
 dev-qt/qtwayland wayland opengl
+# quickshell links the Qt5Compat QML modules
+dev-qt/qt5compat icu qml
 >=dev-qt/qtdeclarative-6.10.1 opengl
  x11-libs/libxkbcommon X wayland
 >=sys-apps/systemd-259 policykit
@@ -206,10 +208,85 @@ gui-libs/gtk-layer-shell introspection
 x11-terms/kitty wayland
 # ly display manager should enumerate X sessions and install systemd unit
 x11-misc/ly X systemd
+# quickshell crash-handler unwind support
+dev-cpp/cpptrace unwind
+# Python 3.13 targets for packages not yet supporting 3.14
+gui-apps/waypaper python_targets_python3_13
+gui-apps/nwg-displays python_targets_python3_13
+x11-misc/variety python_targets_python3_13
+dev-python/pycairo python_targets_python3_13
+dev-python/pygobject python_targets_python3_13
+dev-python/imageio python_targets_python3_13
+dev-python/imageio-ffmpeg python_targets_python3_13
+dev-python/screeninfo python_targets_python3_13
 # mpv/vlc dependency
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
 }
+
+# Explicit per-atom keywords: the overlay packages this installer selects are
+# ~amd64, but accepting "*/*::<overlay>" would keyword every package that
+# overlay ships, including ones this installer never merges. An existing
+# blanket entry is respected, so such a host gets no extra lines.
+ensure_keyword_entry() {
+  local file="$1" entry="$2" repo="$3"
+  sudo mkdir -p "$(dirname "$file")"
+  sudo touch "$file"
+  if sudo grep -qxF -- "$entry" "$file" 2>/dev/null; then
+    return 0
+  fi
+  if [ -n "$repo" ] && sudo grep -qE "^[[:space:]]*\*/\*::${repo}([[:space:]]|$)" "$file" 2>/dev/null; then
+    return 0
+  fi
+  printf '%s\n' "$entry" | sudo tee -a "$file" >/dev/null
+  echo "[OK] Added ${entry} to ${file}"
+}
+
+ensure_overlay_keywords() {
+  echo "[INFO] Ensuring ~amd64 keywords for the overlay and testing packages this installer needs"
+  local kw_dir="/etc/portage/package.accept_keywords"
+  local entry
+  sudo mkdir -p "$kw_dir"
+
+  for entry in \
+    "gui-wm/hyprland::hyproverlay ~amd64" \
+    "gui-libs/hyprwire::hyproverlay ~amd64" \
+    "gui-libs/hyprcursor::hyproverlay ~amd64" \
+    "gui-libs/hyprutils::hyproverlay ~amd64" \
+    "gui-libs/hyprland-qt-support::hyproverlay ~amd64" \
+    "gui-libs/hyprland-guiutils::hyproverlay ~amd64" \
+    "gui-apps/hypridle::hyproverlay ~amd64" \
+    "gui-apps/hyprlock::hyproverlay ~amd64" \
+    "gui-apps/hyprpaper::hyproverlay ~amd64" \
+    "gui-apps/hyprshot::hyproverlay ~amd64" \
+    "gui-libs/xdg-desktop-portal-hyprland::hyproverlay ~amd64"; do
+    ensure_keyword_entry "${kw_dir}/hyproverlay" "$entry" hyproverlay
+  done
+
+  for entry in \
+    "gui-apps/quickshell::guru ~amd64" \
+    "dev-cpp/cpptrace::guru ~amd64" \
+    "dev-libs/libdwarf::guru ~amd64"; do
+    ensure_keyword_entry "${kw_dir}/guru" "$entry" guru
+  done
+
+  for entry in \
+    "dev-cpp/sdbus-c++ ~amd64" \
+    "gui-apps/uwsm ~amd64" \
+    "gui-libs/gtk4-layer-shell ~amd64" \
+    "dev-libs/wayland-protocols ~amd64" \
+    "dev-util/wayland-scanner ~amd64" \
+    "dev-libs/wayland ~amd64" \
+    "gui-apps/quickshell ~amd64" \
+    "dev-cpp/cpptrace ~amd64" \
+    "dev-libs/libdwarf ~amd64" \
+    "dev-python/imageio ~amd64" \
+    "dev-python/imageio-ffmpeg ~amd64"; do
+    ensure_keyword_entry "${kw_dir}/hypr-gentoo" "$entry" ""
+  done
+  echo "[OK] Overlay keywords configured."
+}
+
 ensure_video_cards() {
   echo "[INFO] Ensuring VIDEO_CARDS reflects detected GPU hardware..."
   local mc="/etc/portage/make.conf"
@@ -935,6 +1012,7 @@ HYPR_PACKAGES=(
   media-video/pipewire
   media-video/wireplumber
   media-libs/alsa-lib
+  media-plugins/alsa-plugins
   media-libs/libshumate
   media-libs/mesa
   media-sound/alsa-utils
@@ -1027,6 +1105,7 @@ fi
 
 echo "[INFO] Starting Gentoo Hyprland package installation"
 ensure_use_flags
+ensure_overlay_keywords
 ensure_video_cards
 ensure_gentoo_rsync_repo
 ensure_hyproverlay_repo

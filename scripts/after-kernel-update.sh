@@ -20,7 +20,8 @@ prune_kernels_missing_modules() {
   running_version="$(uname -r)"
 
   while IFS= read -r kernel_path; do
-    version="${kernel_path#/boot/kernel-}"
+    # installkernel may write either kernel-<ver> or vmlinuz-<ver>.
+    version="$(basename -- "$kernel_path" | sed -E 's/^(kernel|vmlinuz)-//')"
     [ -n "$version" ] || continue
 
     if [ "$version" = "$running_version" ]; then
@@ -29,23 +30,23 @@ prune_kernels_missing_modules() {
 
     if [ ! -d "/lib/modules/${version}" ]; then
       log "Removing kernel ${version} from /boot (missing /lib/modules/${version})..."
-      rm -f "/boot/kernel-${version}" "/boot/initramfs-${version}.img"
+      rm -f "/boot/kernel-${version}" "/boot/vmlinuz-${version}" "/boot/initramfs-${version}.img"
     fi
-  done < <(find /boot -maxdepth 1 -type f -name 'kernel-*' -printf '%p\n' | sort -V)
+  done < <(find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -printf '%p\n' | sort -V)
 }
 latest_boot_kernel_version() {
-  find /boot -maxdepth 1 -type f -name 'kernel-*' -printf '%f\n' 2>/dev/null \
-    | sed 's/^kernel-//' \
+  find /boot -maxdepth 1 -type f \( -name 'kernel-*' -o -name 'vmlinuz-*' \) -printf '%f\n' 2>/dev/null \
+    | sed -E 's/^(kernel|vmlinuz)-//' \
     | sort -V \
     | tail -n 1
 }
 
 verify_latest_kernel_artifacts() {
   local latest="$1"
-  [[ -n "$latest" ]] || fail "No kernel-* images found in /boot after cleanup."
+  [[ -n "$latest" ]] || fail "No kernel images (kernel-* or vmlinuz-*) found in /boot after cleanup."
 
-  if [[ ! -f "/boot/kernel-${latest}" ]]; then
-    fail "Missing /boot/kernel-${latest}"
+  if [[ ! -f "/boot/kernel-${latest}" && ! -f "/boot/vmlinuz-${latest}" ]]; then
+    fail "Missing /boot/kernel-${latest} or /boot/vmlinuz-${latest}"
   fi
   if [[ ! -f "/boot/initramfs-${latest}.img" ]]; then
     fail "Missing /boot/initramfs-${latest}.img"
@@ -79,8 +80,11 @@ verify_grub_cfg_contains_latest() {
   local latest="$1"
   [[ -f /boot/grub/grub.cfg ]] || fail "Missing /boot/grub/grub.cfg after grub-mkconfig"
 
-  if ! grep -Fq "kernel-${latest}" /boot/grub/grub.cfg; then
-    fail "grub.cfg does not reference kernel-${latest}"
+  # Match the exact image name, not a bare "-$latest" (which could hit an
+  # unrelated string such as a distro or module path).
+  if ! grep -Fq "kernel-${latest}" /boot/grub/grub.cfg &&
+    ! grep -Fq "vmlinuz-${latest}" /boot/grub/grub.cfg; then
+    fail "grub.cfg does not reference kernel-${latest} or vmlinuz-${latest}"
   fi
 }
 

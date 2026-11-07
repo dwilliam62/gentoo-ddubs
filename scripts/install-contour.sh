@@ -45,25 +45,10 @@ need_root "$@"
 # contents up outside /etc/portage and skips the write when nothing changed
 # (docs/fix-contour-plan.md, "What the script does not handle" row 8).
 
-# Warn when a managed file already holds entries the fresh contents drop.
-# Host-specific additions belong in a separate snippet so a rerun cannot erase
-# them (qtbase[vulkan] for an installed gui-apps/quickshell, for example).
-warn_drift_from_managed() {
-  local path="$1" content="$2" line extra=()
-  [ -f "$path" ] || return 0
-  while IFS= read -r line; do
-    line=${line%%#*}
-    line=$(printf '%s\n' "$line" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//')
-    [ -n "$line" ] || continue
-    printf '%s\n' "$content" | grep -qxF -- "$line" || extra+=("$line")
-  done <"$path"
-  if [ "${#extra[@]}" -eq 0 ]; then
-    return 0
-  fi
-  log_warn "Existing ${path} has entries this script does not write:"
-  printf '    %s\n' "${extra[@]}" >&2
-  log_warn "Keep host-specific entries in a separate file (for example ${path}-extra); a rerun would drop them here."
-}
+# Managed writes and drift warnings come from scripts/lib/common.sh:
+# portage_write_file() backs up outside /etc/portage and skips unchanged
+# writes, and warn_drift_from_managed() reports host-specific entries the
+# fresh contents would drop (qtbase[vulkan] for gui-apps/quickshell, e.g.).
 
 if [ "$CHECK_ONLY" = false ]; then
   step "Step 1: Ensuring eselect-repository is installed..."
