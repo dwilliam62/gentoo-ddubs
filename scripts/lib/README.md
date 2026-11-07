@@ -47,6 +47,11 @@ Colour is disabled automatically when stdout is not a terminal, when
 | `portage_write_file /etc/portage/package.use/foo <<'EOF' ... EOF` | replaces a config file from stdin, backing up the old contents first and skipping the write when they already match |
 | `warn_drift_from_managed /etc/portage/package.use/foo "$content"` | reports entries the existing file holds that the new contents would drop (call it just before `portage_write_file`) |
 
+`warn_drift_from_managed` normalizes **both** sides (comments stripped,
+whitespace collapsed, lines trimmed) before comparing, so an indented or
+space-padded file does not report entries it actually still writes. It is meant
+for one-entry-per-line Portage files; don't run it over a shell script.
+
 `portage_write_file` is the way to rewrite a file the script owns: a rerun with
 identical contents leaves the file alone, and a changed file is preserved first.
 Backups deliberately live **outside** `/etc/portage` (default

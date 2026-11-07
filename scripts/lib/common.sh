@@ -219,19 +219,31 @@ portage_write_file() {
   printf '%s\n' "$content" > "$path"
 }
 
+# Strip a trailing comment and collapse runs of whitespace, so indentation and
+# spacing differences do not make two otherwise identical lines look different.
+_normalize_config_line() {
+  local line="${1%%#*}"
+  printf '%s\n' "$line" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//'
+}
+
 # Warn when a managed file already holds entries the fresh contents drop. Call
 # this before portage_write_file so host-specific additions are reported
 # instead of vanishing: they belong in a separate "<file>-extra" snippet.
+# Both sides are normalized, so indented files do not report false drift.
 #   warn_drift_from_managed "$path" "$content"
 warn_drift_from_managed() {
-  local path="$1" content="$2" line extra=()
+  local path="$1" content="$2" line managed="" extra=()
   # Unreadable files are skipped: the caller's write reports its own errors.
   [ -r "$path" ] || return 0
   while IFS= read -r line; do
-    line=${line%%#*}
-    line=$(printf '%s\n' "$line" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//')
+    line=$(_normalize_config_line "$line")
     [ -n "$line" ] || continue
-    printf '%s\n' "$content" | grep -qxF -- "$line" || extra+=("$line")
+    managed+="${line}"$'\n'
+  done <<< "$content"
+  while IFS= read -r line; do
+    line=$(_normalize_config_line "$line")
+    [ -n "$line" ] || continue
+    grep -qxF -- "$line" <<< "$managed" || extra+=("$line")
   done <"$path"
   if [ "${#extra[@]}" -eq 0 ]; then
     return 0
