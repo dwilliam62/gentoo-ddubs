@@ -30,8 +30,9 @@ The script fixes the issues found on that host, but it is **not a universal fix*
   `PORTAGE_BACKUP_DIR`) before replacing it, and leaves it untouched when the contents
   already match. Backups live outside `/etc/portage` so Portage never reads them as
   configuration.
-- Warns when an existing `package.use/contour` sets Qt flags the new contents drop, and
-  points at a separate file (`package.use/contour-extra`) for host-specific flags.
+- Warns when any of the three managed files already holds entries the new contents
+  drop, and points at a separate `-extra` snippet (`package.use/contour-extra` for
+  example) so host-specific entries survive a rerun.
 - Warns when global USE or another `package.use` file re-enables `qml`/`vulkan`, and prints the effective flags from `equery uses`.
 - Provides `--check-only`, which writes the Portage configuration, skips overlay setup (Steps 1–2), and previews both emerge commands with `--pretend`.
 

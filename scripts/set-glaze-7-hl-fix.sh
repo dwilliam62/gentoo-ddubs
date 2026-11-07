@@ -229,13 +229,14 @@ if [ "$CHECK_ONLY" = true ]; then
   log_step "Check Complete (Dry Run Mode)"
   if [ "$GLAZE_ISSUE" = true ]; then
     log_warn "Host is AFFECTED: Glaze 8 is present or unmasked."
-    printf "      Run with '--mask-glaze' to apply the mask and exit, or run without options\\n"
-    printf "      to interactively apply the mask and rebuild Hyprland when needed.\\n\\n"
+    printf "      Run with '--mask-glaze' to apply the mask and exit, or run without options\n"
+    printf "      to interactively apply the mask and rebuild Hyprland when needed.\n\n"
   elif [ "$REBUILD_NEEDED" = true ]; then
     log_warn "Glaze 7 is configured, but Hyprland requires a rebuild for updated libraries."
-    printf "      Run with '--rebuild-hyprland' to rebuild Hyprland and resolve preserved libraries.\\n\\n"
+    printf "      Run with '--rebuild-hyprland' to rebuild Hyprland and resolve preserved libraries.\n\n"
   else
-    log_ok "Host is CLEAN: Glaze 7.x is active, properly masked, and Hyprland is up to date.\\n\\n"
+    log_ok "Host is CLEAN: Glaze 7.x is active, properly masked, and Hyprland is up to date."
+    printf '\n'
   fi
   exit 0
 fi
@@ -423,12 +424,12 @@ printf "  %-26s %s\n" "Preserved Rebuild:" "$(format_status "$STATUS_PRESERVED")
 printf "  ${DIM}%-26s %s${RESET}\n" "──────────────────────────" "────────────────────────────────"
 
 if [ "$OVERALL_RESULT" = "SUCCESS" ]; then
-  printf "  ${BOLD}%-26s %b✔ PASSED (Hyprland build & fix verified)%b${RESET}\\n\\n" "OVERALL RESULT:" "${GREEN}" "${RESET}"
+  printf "  ${BOLD}%-26s %b✔ PASSED (Hyprland build & fix verified)%b${RESET}\n\n" "OVERALL RESULT:" "${GREEN}" "${RESET}"
   exit 0
 elif [ "$OVERALL_RESULT" = "COMPLETED" ]; then
-  printf "  ${BOLD}%-26s %b✔ COMPLETED (Configuration applied; Hyprland rebuild not requested)%b${RESET}\\n\\n" "OVERALL RESULT:" "${GREEN}" "${RESET}"
+  printf "  ${BOLD}%-26s %b✔ COMPLETED (Configuration applied; Hyprland rebuild not requested)%b${RESET}\n\n" "OVERALL RESULT:" "${GREEN}" "${RESET}"
   exit 0
 else
-  printf "  ${BOLD}%-26s %b✘ FAILED (Check logs above for details)%b${RESET}\\n\\n" "OVERALL RESULT:" "${RED}" "${RESET}"
+  printf "  ${BOLD}%-26s %b✘ FAILED (Check logs above for details)%b${RESET}\n\n" "OVERALL RESULT:" "${RED}" "${RESET}"
   exit 1
 fi
