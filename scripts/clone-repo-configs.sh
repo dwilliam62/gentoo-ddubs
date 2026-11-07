@@ -190,11 +190,16 @@ set_gpu_specific_mesa_flags() {
     return 0
   fi
 
+  local mesa_content libdrm_content
   mkdir -p /etc/portage/package.use
-  printf 'media-libs/mesa %s\n' "${flags[*]}" >"$mesa_file"
+  mesa_content="media-libs/mesa ${flags[*]}"
+  warn_drift_from_managed "$mesa_file" "$mesa_content"
+  printf '%s\n' "$mesa_content" >"$mesa_file"
 
   if [[ "$needs_amd_libdrm_fix" = "true" ]]; then
-    printf '>=x11-libs/libdrm-2.4.134 video_cards_radeon\n' >"$libdrm_file"
+    libdrm_content='>=x11-libs/libdrm-2.4.134 video_cards_radeon'
+    warn_drift_from_managed "$libdrm_file" "$libdrm_content"
+    printf '%s\n' "$libdrm_content" >"$libdrm_file"
   else
     rm -f "$libdrm_file"
   fi
@@ -230,6 +235,7 @@ ensure_ly_package_use_for_init() {
   fi
 
   mkdir -p /etc/portage/package.use
+  warn_drift_from_managed "$ly_use_file" "$ly_flags"
   printf '%s\n' "$ly_flags" >"$ly_use_file"
 }
 
@@ -254,11 +260,15 @@ ensure_audio_runtime_support() {
   if [[ "$DRY_RUN" = "true" ]]; then
     say "Would write ${audio_use_file} for PipeWire/ALSA compatibility."
   else
+    local audio_content
     mkdir -p /etc/portage/package.use
-    cat >"$audio_use_file" <<'EOF'
+    audio_content=$(cat <<'EOF'
 media-video/pipewire dbus sound-server pulseaudio extra alsa-pipewire
 >=media-plugins/alsa-plugins-1.2.12 pulseaudio
 EOF
+)
+    warn_drift_from_managed "$audio_use_file" "$audio_content"
+    printf '%s\n' "$audio_content" >"$audio_use_file"
   fi
 
   say "Ensuring desktop audio runtime compatibility (PipeWire/WirePlumber/ALSA plugins)..."

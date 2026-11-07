@@ -133,7 +133,7 @@ sync-uri = ${HYPROVERLAY_SYNC_URI}
 auto-sync = yes
 EOF
 )
-    write_portage_file "${HYPROVERLAY_REPO_CONF}" "$hyproverlay_conf"
+    write_managed_file "${HYPROVERLAY_REPO_CONF}" "$hyproverlay_conf"
   fi
 
   if command -v emaint >/dev/null 2>&1; then
@@ -227,11 +227,11 @@ dev-python/screeninfo python_targets_python3_13
 >=media-libs/vulkan-loader-1.4.335.0-r1 X
 EOF
 )
-  write_portage_file "$use_file" "$use_content"
+  write_managed_file "$use_file" "$use_content"
 }
 
 # Replace a script-managed Portage file, reporting entries it would drop first.
-write_portage_file() {
+write_managed_file() {
   local file="$1" content="$2"
   warn_drift_from_managed "$file" "$content"
   printf '%s\n' "$content" | sudo tee "$file" >/dev/null
@@ -337,7 +337,7 @@ ensure_video_cards() {
   fi
   if printf ' %s ' "$cards" | grep -qE ' (amdgpu|radeonsi) '; then
     sudo mkdir -p /etc/portage/package.use
-    write_portage_file "$libdrm_use_file" '>=x11-libs/libdrm-2.4.134 video_cards_radeon'
+    write_managed_file "$libdrm_use_file" '>=x11-libs/libdrm-2.4.134 video_cards_radeon'
     echo "[OK] Added AMD libdrm USE compatibility: $libdrm_use_file"
   elif [[ -f "$libdrm_use_file" ]]; then
     sudo rm -f "$libdrm_use_file"
@@ -568,7 +568,7 @@ sync-uri = rsync://rsync.gentoo.org/gentoo-portage
 auto-sync = yes
 EOF
 )
-  write_portage_file "${gentoo_conf}" "$gentoo_conf_content"
+  write_managed_file "${gentoo_conf}" "$gentoo_conf_content"
 
   if [ -d /var/db/repos/gentoo ]; then
     echo "[INFO] Removing any git metadata from /var/db/repos/gentoo for rsync"
@@ -588,7 +588,7 @@ ensure_pamixer_cxx17_fix() {
 CXXFLAGS="${CXXFLAGS} -std=c++17"
 EOF
 )
-  write_portage_file /etc/portage/env/cxx17-fix "$cxx17_content"
+  write_managed_file /etc/portage/env/cxx17-fix "$cxx17_content"
 
   # Handle both valid Portage layouts:
   # 1) /etc/portage/package.env as a file
@@ -681,7 +681,7 @@ ensure_discord_license_acceptance() {
     if [[ -f "$package_license_file" ]] && sudo grep -q '^net-im/discord[[:space:]].*all-rights-reserved' "$package_license_file"; then
       echo "[OK] Discord license acceptance already configured."
     else
-      write_portage_file "$package_license_file" "$line"
+      write_managed_file "$package_license_file" "$line"
       echo "[OK] Added Discord license acceptance to ${package_license_file}."
     fi
     return 0
@@ -824,6 +824,47 @@ EOF
 
   # Make it executable
   sudo chmod +x /etc/kernel/postinst.d/99-efi-update.sh
+}
+
+# Separate from the EFI-copy hook on purpose: that one is skipped (and removed)
+# on GRUB-managed systems, but every kernel install should leave a report.
+ensure_kernel_check_report_hook() {
+  local postinst_dir="${KERNEL_POSTINST_DIR:-/etc/kernel/postinst.d}"
+  local hook="${postinst_dir}/90-after-kernel-update-check"
+  local check_script="${SCRIPT_DIR}/after-kernel-update.sh"
+  local report_log="${KERNEL_CHECK_LOG:-/var/log/after-kernel-update-check.log}"
+  local hook_content
+
+  echo "[INFO] Ensuring kernel postinst hook records an after-kernel-update --check report"
+  sudo mkdir -p "$postinst_dir"
+
+  hook_content=$(cat <<EOF
+#!/bin/sh
+# Record boot/kernel health after every kernel install. Best-effort only: a
+# failing check is logged, never fails the merge.
+KVER="\${1:-unknown}"
+CHECK_SCRIPT="${check_script}"
+REPORT_LOG="${report_log}"
+
+{
+  printf '=== %s kernel %s ===\\n' "\$(date -Is 2>/dev/null || date)" "\$KVER"
+  if [ ! -f "\$CHECK_SCRIPT" ]; then
+    printf 'check script missing: %s\\n' "\$CHECK_SCRIPT"
+    printf 'result: PROBLEMS (see above)\\n'
+  elif bash "\$CHECK_SCRIPT" --check; then
+    printf 'result: OK\\n'
+  else
+    printf 'result: PROBLEMS (see above)\\n'
+  fi
+} >>"\$REPORT_LOG" 2>&1 || true
+exit 0
+EOF
+)
+
+  # Plain tee, not write_managed_file: the hook is script-owned and always
+  # regenerated, and the drift check is meant for atom-per-line Portage files.
+  printf '%s\n' "$hook_content" | sudo tee "$hook" >/dev/null
+  sudo chmod +x "$hook"
 }
 
 detect_efi_mountpoint() {
@@ -1134,6 +1175,7 @@ ensure_pipewire_use_fix
 ensure_virt_viewer_portage_fixes
 ensure_discord_license_acceptance
 ensure_kernel_postinst_efi_update
+ensure_kernel_check_report_hook
 prebuild_problematic_binaries
 install_list "Hyprland stack" "${HYPR_PACKAGES[@]}"
 install_latest_yazi_from_script
