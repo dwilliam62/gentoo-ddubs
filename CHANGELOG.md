@@ -27,6 +27,13 @@ All notable changes to this project will be documented in this file.
   - Fixed dead variables, `local` masking exit status (SC2155), literal `=~` matching (SC2076), sudo redirects (SC2024) and unquoted pattern removal (SC2295)
   - Seven `SC2016` notes remain by design: awk field references and a runtime-expanded `$(id -u)` written into shell rc files
   - shellcheck is not installable here (masked `~amd64`, pulls masked `dev-haskell/aeson`), so the official static binary is used
+- Reworked `scripts/install-contour.sh`
+  - Added `--check-only` and `--help`; check-only writes the Portage configuration, skips Steps 1–2 (overlay setup), reports Qt USE overrides, and previews the Qt rebuild and Contour emerge with `emerge --pretend` without merging anything
+  - Trimmed the generated `/etc/portage/package.use/contour`: dropped `qml`, `vulkan` and `qtquick3d`, while keeping `opengl` on `qtbase`, `qtdeclarative` and `qtmultimedia` because their `opengl=` USE dependencies must match
+  - Kept `sys-libs/zlib minizip` because the installed `virtual/minizip` (pulled in by `media-libs/assimp`) requires it; documented why `qml`/`vulkan` are not negated (`quickshell` hard-requires `qtbase[vulkan]`, and other `package.use` files enable `qml`)
+  - Suppressed Portage's "binary packages have been ignored due to non matching USE" warning with `--binpkg-respect-use=y` on every emerge
+  - Step 6 now uses `--oneshot` so the Qt dependencies stay out of `@world`; `@world` keeps only `gui-apps/contour`
+  - Added non-fatal warnings when global `USE` or another `package.use` file turns `qml`/`vulkan` back on, followed by the effective per-package flags from `equery uses`
 
 ## Oct 2026
 

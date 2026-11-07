@@ -3,6 +3,11 @@
 # Script: install-contour.sh
 # Description: Installs gui-apps/contour on Gentoo Linux with all necessary
 #              overlay configurations, dependency masks, and USE flags.
+# Usage:
+#   bash install-contour.sh [--check-only]
+#
+#   --check-only  Write the Portage configuration, report Qt USE-flag
+#                 overrides, and preview the emerge plan with --pretend.
 # ==============================================================================
 
 set -euo pipefail
@@ -14,23 +19,46 @@ SCRIPT_DIR="${SCRIPT_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
   exit 1
 }
 
+print_usage() {
+  cat <<'EOF'
+Usage: install-contour.sh [--check-only]
+
+  --check-only  Write the Portage configuration, report Qt USE-flag
+                overrides, and preview the emerge plan with --pretend.
+  --help        Show this help and exit.
+EOF
+}
+
+CHECK_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --check-only) CHECK_ONLY=true ;;
+    -h|--help) print_usage; exit 0 ;;
+    *) die "Unknown argument: $arg (try --help)" ;;
+  esac
+done
+
 need_root "$@"
 
-step "Step 1: Ensuring eselect-repository is installed..."
-# eselect-repository is an eselect module, not a standalone binary, so probe the
-# module through eselect itself instead of looking for a command of that name.
-if ! have eselect || ! eselect repository list >/dev/null 2>&1; then
-  emerge --noreplace app-eselect/eselect-repository ||
-    die "Failed to install app-eselect/eselect-repository."
-fi
+if [ "$CHECK_ONLY" = false ]; then
+  step "Step 1: Ensuring eselect-repository is installed..."
+  # eselect-repository is an eselect module, not a standalone binary, so probe the
+  # module through eselect itself instead of looking for a command of that name.
+  if ! have eselect || ! eselect repository list >/dev/null 2>&1; then
+    emerge --noreplace app-eselect/eselect-repository ||
+      die "Failed to install app-eselect/eselect-repository."
+  fi
 
-step "Step 2: Enabling and syncing the 'guru' overlay..."
-eselect repository enable guru ||
-  log_warn "Could not enable the guru overlay; it may already be configured."
-if have emaint; then
-  emaint sync -r guru || log_warn "Syncing guru failed; continuing with existing metadata."
+  step "Step 2: Enabling and syncing the 'guru' overlay..."
+  eselect repository enable guru ||
+    log_warn "Could not enable the guru overlay; it may already be configured."
+  if have emaint; then
+    emaint sync -r guru || log_warn "Syncing guru failed; continuing with existing metadata."
+  else
+    log_warn "emaint not found; skipping guru sync."
+  fi
 else
-  log_warn "emaint not found; skipping guru sync."
+  say "Check-only: skipping Steps 1-2 (overlay setup)."
 fi
 
 step "Step 3: Configuring package.accept_keywords for Contour and GURU dependencies..."
@@ -53,24 +81,94 @@ EOF
 step "Step 5: Configuring USE flags for Qt and Contour dependencies..."
 mkdir -p /etc/portage/package.use
 cat << 'EOF' > /etc/portage/package.use/contour
-# Required by Contour QML UI (Terminal.qml) and Qt6 Wayland/OpenGL/Vulkan stack
-dev-qt/qtbase opengl vulkan
-dev-qt/qtdeclarative opengl vulkan
-dev-qt/qtmultimedia qml opengl vulkan
-dev-qt/qtquick3d opengl vulkan
-dev-qt/qt5compat qml
+# Contour's ebuild requires qtbase[opengl] and links the C++ Qt6::Multimedia API.
+# qtdeclarative and qtmultimedia carry "opengl=" USE dependencies on qtbase, so
+# they must match. Contour uses no Multimedia/Qt5Compat QML modules, so those
+# flags (and qtquick3d, which qtmultimedia[qml] would pull in) are omitted.
+# Rendering is OpenGL; Vulkan is not added here (global USE still applies).
+# qml and vulkan are not negated on purpose:
+#  - /etc/portage/package.use/qtmultimedia and .../quickshell enable qml;
+#    quickshell uses Qt5Compat QML, so forcing -qml would break it.
+#  - gui-apps/quickshell hard-requires qtbase[vulkan] in its ebuild (it has no
+#    vulkan USE flag), so qtbase cannot be rebuilt with -vulkan while it is
+#    installed.
+# zlib[minizip] is required by the installed virtual/minizip package.
+dev-qt/qtbase opengl
+dev-qt/qtdeclarative opengl
+dev-qt/qtmultimedia opengl
 sys-libs/zlib minizip
 EOF
 
+# Report flags that other Portage configuration forces back on. This file
+# deliberately omits qml and vulkan, but global USE or other package.use
+# entries can still enable them for the Qt stack.
+qt_use_warned=false
+for qt_flag in qml vulkan; do
+  if have portageq && portageq envvar USE 2>/dev/null | tr ' ' '\n' | grep -qx "$qt_flag"; then
+    log_warn "Global USE enables '${qt_flag}'; Qt packages will still be built with it."
+    qt_use_warned=true
+  fi
+done
+
+qt_use_overrides=""
+if [ -d /etc/portage/package.use ]; then
+  qt_use_overrides=$(
+    grep -RHnE 'dev-qt/(qtbase|qtdeclarative|qtmultimedia|qtquick3d|qt5compat|qttools|qt3d)(:[0-9]+)?[[:space:]]' /etc/portage/package.use 2>/dev/null |
+      grep -v '/contour:' | sed 's/#.*//' |
+      grep -E '(^|[[:space:]])(qml|vulkan)([[:space:]]|$)' || true
+  )
+elif [ -f /etc/portage/package.use ]; then
+  qt_use_overrides=$(
+    grep -HnE 'dev-qt/(qtbase|qtdeclarative|qtmultimedia|qtquick3d|qt5compat|qttools|qt3d)(:[0-9]+)?[[:space:]]' /etc/portage/package.use 2>/dev/null |
+      sed 's/#.*//' |
+      grep -E '(^|[[:space:]])(qml|vulkan)([[:space:]]|$)' || true
+  )
+fi
+if [ -n "$qt_use_overrides" ]; then
+  log_warn "Other package.use files enable qml/vulkan for the Qt stack:"
+  printf '%s\n' "$qt_use_overrides" | sed 's/^/    /' >&2
+  qt_use_warned=true
+fi
+
+if [ "$qt_use_warned" = true ] && have equery; then
+  log_info "Effective flags on the affected Qt packages:"
+  for qt_pkg in dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia; do
+    qt_pkg_flags=$(equery -q uses "$qt_pkg" 2>/dev/null | grep -E '^[+-](qml|vulkan|opengl)$' | tr '\n' ' ' | sed 's/[[:space:]]*$//' || true)
+    if [ -n "$qt_pkg_flags" ]; then
+      log_info "  ${qt_pkg}: ${qt_pkg_flags}"
+    fi
+  done
+fi
+
+if [ "$CHECK_ONLY" = true ]; then
+  step "Preview: rebuilding the Qt dependencies (emerge --pretend)..."
+  emerge -p -v --changed-use --noreplace --oneshot --binpkg-respect-use=y \
+    dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia dev-qt/qt5compat ||
+    log_warn "Preview failed; the guru overlay may need to be enabled and synced."
+
+  step "Preview: gui-apps/contour (emerge --pretend)..."
+  emerge -p -v --binpkg-respect-use=y gui-apps/contour ||
+    log_warn "Preview failed; the guru overlay may need to be enabled and synced."
+
+  log_ok "Check-only complete; no packages were merged."
+  exit 0
+fi
+
 step "Step 6: Updating Qt dependencies with new USE flags..."
-emerge --changed-use --noreplace dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia dev-qt/qtquick3d dev-qt/qt5compat ||
+# A binpkg cache/binhost may hold Qt builds with different USE flags. Respect
+# them silently (they are unusable for this config anyway) instead of letting
+# Portage print its "binary packages have been ignored" warning block.
+# --oneshot keeps these dependencies out of @world: Contour is the only
+# package this script intends to select.
+emerge --changed-use --noreplace --oneshot --binpkg-respect-use=y \
+  dev-qt/qtbase dev-qt/qtdeclarative dev-qt/qtmultimedia dev-qt/qt5compat ||
   die "Failed to rebuild the Qt dependencies with the new USE flags."
 
 step "Step 7: Emerging gui-apps/contour..."
 if [ -t 0 ]; then
-  emerge -av gui-apps/contour || die "gui-apps/contour failed to build."
+  emerge -av --binpkg-respect-use=y gui-apps/contour || die "gui-apps/contour failed to build."
 else
-  emerge -v gui-apps/contour || die "gui-apps/contour failed to build."
+  emerge -v --binpkg-respect-use=y gui-apps/contour || die "gui-apps/contour failed to build."
 fi
 
 log_ok "Installation complete! You can now launch Contour with: contour"
