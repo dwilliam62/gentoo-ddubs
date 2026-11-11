@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
 - `gui-apps/waybar` is built with the modules the bar config uses
   - `system/etc/portage/package.use/waybar` enables `mpris network pulseaudio tray`; the bar logged `Unknown module` for all four and rendered empty slots
   - `emerge -pv` shows only waybar itself rebuilding - no new dependencies
+- The patched Waybar launcher now lives in the repo
+  - The include check sat in KooL's `~/.config/hypr/scripts/WaybarStartup.sh`, which is outside the repo and is replaced wholesale by dots updates, so the check silently disappeared
+  - `dotfiles/home/.config/hypr/scripts/WaybarStartup.sh` carries the patched launcher, so `scripts/deploy-dotfiles.sh` restores it after an update; re-deploy after any KooL update
+- `package.use/llvm-core` snapshot matches the host again
+  - Upstream moved `llvm-core/libclc` to `llvm-runtimes/libclc`; the drift check reported the repo snapshot as stale
 - `update.sh` survives Haskell ABI breakage
   - A `--apply` run used to abort as soon as a `dev-haskell` package died in `src_configure` with `//==-- Please, run 'haskell-updater' to fix broken packages --==//` (seen with `dev-haskell/tls-2.1.5`), leaving the rest of `@world` unmerged
   - Portage sub-slots cannot track GHC/library ABI hashes, so the apply step now recognises that message, runs `haskell-updater --all` and retries the update once

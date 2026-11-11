@@ -1,1 +1,2 @@
-llvm-core/libclc llvm_slot_21
+# move llvm-core/libclc llvm-runtimes/libclc
+llvm-runtimes/libclc llvm_slot_21
