@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## Nov 2026
 
+- `update.sh` survives Haskell ABI breakage
+  - A `--apply` run used to abort as soon as a `dev-haskell` package died in `src_configure` with `//==-- Please, run 'haskell-updater' to fix broken packages --==//` (seen with `dev-haskell/tls-2.1.5`), leaving the rest of `@world` unmerged
+  - Portage sub-slots cannot track GHC/library ABI hashes, so the apply step now recognises that message, runs `haskell-updater --all` and retries the update once
+  - When `haskell-updater` is not installed the run explains how to add it (`app-admin/haskell-updater` is `~amd64`) instead of stopping without a hint
+  - emerge output is teed to a temporary log, so the failure is detectable while progress still reaches the terminal
+  - `--apply` passes `--keep-going`, so one failing ebuild no longer holds back the merge of the rest of `@world`
+  - `--eval`/`--dry-run` now warn before the fact when `ghc-pkg check` reports broken installed packages, or when `dev-lang/ghc` or `dev-haskell/*` packages are queued for upgrade
+  - New `--haskell-only` mode runs `haskell-updater --all` and exits without syncing, for repairing the Haskell stack on its own
+  - `--haskell-only` accepts extra atoms and forwards them to emerge (`haskell-updater --all -- dev-haskell/tls`), so one broken dependency can be targeted
+  - The Haskell warning is also written into `precheck-<DATE>.md` under `## Haskell Rebuild Required`, not just printed
+  - `Post-Update-<DATE>-Report.md` is now written even when `--keep-going` leaves packages unmerged, listing them under `## Failed Packages` with an `incomplete` status
 - Refactored all 29 scripts onto a shared library
   - Added `scripts/lib/common.sh` (with `scripts/lib/README.md` documenting the API)
     - Colours, icons and helpers: `log_info`/`log_ok`/`log_warn`/`log_err`, `die`, `step`, `run_step`/`run_summary`, `have`, `require_cmd`, `need_root`/`require_root`, `portage_conf_file`, `pkg_installed`, `version_ge`

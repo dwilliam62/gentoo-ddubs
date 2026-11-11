@@ -9,13 +9,15 @@ set -euo pipefail
 # - Writes a post-update markdown report: Post-Update-<DATE>-Report.md
 #
 # Usage:
-#   bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--skip-quickshell] [--help]
+#   bash scripts/update.sh [--eval | --dry-run | --apply | --haskell-only] [--no-sync] [--use-binpkgs] [--auto-yes] [--skip-quickshell] [--help]
 #
 # Modes (choose one):
-#   --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
-#   --dry-run     Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
-#   --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
-#   --just-oxwm   Update and rebuild OxWM only.
+#   --eval         Only evaluate and write precheck-<DATE>.md. No changes are made.
+#   --dry-run      Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
+#   --apply        Perform the actual update (requires root; will prompt unless --auto-yes).
+#   --just-oxwm    Update and rebuild OxWM only.
+#   --haskell-only Rebuild the installed dev-haskell packages with haskell-updater and exit.
+#                  Extra atoms are passed through to haskell-updater/emerge.
 #
 # Options:
 #   --no-sync         Do not run emerge --sync first.
@@ -26,8 +28,12 @@ set -euo pipefail
 #
 # Notes:
 # - Running with no arguments shows this help and exits; updates are never implicit.
-# - Post-Update-<DATE>-Report.md is only generated after a successful --apply run.
+# - Post-Update-<DATE>-Report.md is written after every --apply run; when packages
+#   failed to merge it lists them under "Failed Packages".
 # - Set KEEP_KERNELS=<N> to control how many kernels are retained during post-update pruning (default: 2).
+# - If a dev-haskell package fails in src_configure asking for 'haskell-updater'
+#   (GHC/library ABI breakage, which Portage sub-slots cannot track), the apply
+#   step runs 'haskell-updater --all' and retries the update once.
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 log_dir="$HOME/Documents"
@@ -142,12 +148,15 @@ update_oxwm_repo() {
 print_usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/update.sh [--eval | --dry-run | --apply] [--no-sync] [--use-binpkgs] [--auto-yes] [--skip-quickshell] [--help]
+  bash scripts/update.sh [--eval | --dry-run | --apply | --haskell-only] [--no-sync] [--use-binpkgs] [--auto-yes] [--skip-quickshell] [--help]
 
 Modes (choose one):
-  --eval        Only evaluate and write precheck-<DATE>.md. No changes are made.
-  --dry-run     Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
-  --apply       Perform the actual update (requires root; will prompt unless --auto-yes).
+  --eval         Only evaluate and write precheck-<DATE>.md. No changes are made.
+  --dry-run      Preview update actions (pretend). Writes precheck-<DATE>.md. No changes are made.
+  --apply        Perform the actual update (requires root; will prompt unless --auto-yes).
+  --haskell-only Rebuild the installed Haskell (dev-haskell/*) packages and exit (no sync).
+                 Extra atoms are passed through to haskell-updater, e.g.
+                 bash scripts/update.sh --haskell-only dev-haskell/tls
 
 Options:
   --no-sync         Do not run emerge --sync first.
@@ -162,6 +171,8 @@ Examples:
   bash scripts/update.sh --apply --use-binpkgs --auto-yes
   bash scripts/update.sh --apply --skip-quickshell
   bash scripts/update.sh --just-oxwm
+  bash scripts/update.sh --haskell-only
+  bash scripts/update.sh --haskell-only dev-haskell/tls
 EOF
 }
 
@@ -170,6 +181,8 @@ escalate_if_needed() {
   # will run in --eval/--dry-run mode.
   local need_sudo=false
   if [ "${JUST_OXWM:-false}" = "true" ]; then
+    need_sudo=true
+  elif [ "${HASKELL_ONLY:-false}" = "true" ]; then
     need_sudo=true
   elif [ "${APPLY:-false}" = "true" ]; then
     need_sudo=true
@@ -182,7 +195,7 @@ escalate_if_needed() {
     exec sudo -E env \
       DRY_RUN="${DRY_RUN:-false}" EVAL_ONLY="${EVAL_ONLY:-false}" JUST_OXWM="${JUST_OXWM:-false}" \
       NO_SYNC="${NO_SYNC:-false}" USE_BINPKGS="${USE_BINPKGS:-false}" AUTO_YES="${AUTO_YES:-false}" \
-      APPLY="${APPLY:-false}" SKIP_QUICKSHELL="${SKIP_QUICKSHELL:-false}" \
+      APPLY="${APPLY:-false}" SKIP_QUICKSHELL="${SKIP_QUICKSHELL:-false}" HASKELL_ONLY="${HASKELL_ONLY:-false}" \
       bash "$0" "$@"
   fi
 }
@@ -192,6 +205,7 @@ DRY_RUN="false"
 EVAL_ONLY="false"
 APPLY="false"
 JUST_OXWM="false"
+HASKELL_ONLY="false"
 NO_SYNC="false"
 USE_BINPKGS="false"
 AUTO_YES="false"
@@ -203,6 +217,7 @@ for a in "$@"; do
     --eval) EVAL_ONLY="true" ;;
     --apply) APPLY="true" ;;
     --just-oxwm) JUST_OXWM="true" ;;
+    --haskell-only) HASKELL_ONLY="true" ;;
     --no-sync) NO_SYNC="true" ;;
     --use-binpkgs) USE_BINPKGS="true" ;;
     --auto-yes) AUTO_YES="true" ;;
@@ -212,14 +227,19 @@ for a in "$@"; do
   esac
 done
 # If no mode was selected, show help and exit (do nothing by default)
-if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false" ] && [ "$JUST_OXWM" = "false" ]; then
+if [ "$DRY_RUN" = "false" ] && [ "$EVAL_ONLY" = "false" ] && [ "$APPLY" = "false" ] && [ "$JUST_OXWM" = "false" ] && [ "$HASKELL_ONLY" = "false" ]; then
   print_usage
   exit 2
+fi
+if [ "${#args[@]}" -gt 0 ] && [ "$HASKELL_ONLY" != "true" ]; then
+  say "WARN: ignoring extra arguments (only --haskell-only forwards them): ${args[*]}"
 fi
 
 # Common emerge flags
 EMERGE_PRETEND=(-p -v -u -D --newuse --with-bdeps=y --ask=n --color=n --binpkg-respect-use=n @world)
-EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y --binpkg-respect-use=n @world)
+# --keep-going: one failing ebuild (typically a dev-haskell package left with a
+# stale ABI hash) must not stall the merge of the other pending packages.
+EMERGE_UPDATE=(-v -u -D --newuse --with-bdeps=y --binpkg-respect-use=n --keep-going @world)
 [ "$USE_BINPKGS" = "true" ] && EMERGE_PRETEND+=(--getbinpkg) && EMERGE_UPDATE+=(--getbinpkg)
 [ "$SKIP_QUICKSHELL" = "true" ] && EMERGE_PRETEND+=(--exclude=gui-apps/quickshell) && EMERGE_UPDATE+=(--exclude=gui-apps/quickshell)
 [ "$AUTO_YES" = "true" ] || EMERGE_UPDATE=(--ask "${EMERGE_UPDATE[@]}")
@@ -336,9 +356,20 @@ latest_boot_kernel_version() {
     | tail -n 1
 }
 
-# Generate post-update report using the last precheck as the list of upgrades
+# Atoms that --keep-going left unmerged, from either the per-package
+# '>>> Failed to emerge' lines or the trailing failure summary block.
+failed_packages_from_log() {
+  local log="$1"
+  {
+    sed -n 's/^>>> Failed to emerge \([^,]*\),.*/\1/p' "$log"
+    sed -n 's/^ \*  *(\([^:,[:space:]]*\):.*/\1/p' "$log"
+  } | sort -u
+}
+
+# Generate post-update report using the last precheck as the list of upgrades.
+# Pass the file of failed atoms to record a partial run.
 write_post_update_report() {
-  local pre_file="$precheck_md"
+  local pre_file="$precheck_md" failures_file="${1:-}" failed_count=0
   {
     echo "# Gentoo Post-Update Report"
     date -u "+%F %T UTC" | sed 's/^/Completed: /'
@@ -351,6 +382,12 @@ write_post_update_report() {
       upgraded=$(grep -E '^\| ' "$pre_file" | tail -n +2 | wc -l | tr -d ' ')
     fi
     echo "- Packages upgraded: $upgraded"
+    if [ -n "$failures_file" ] && [ -s "$failures_file" ]; then
+      failed_count=$(wc -l <"$failures_file" | tr -d ' ')
+      echo "- Status: incomplete — $failed_count package(s) failed to merge"
+    else
+      echo "- Status: complete"
+    fi
 
     echo
     echo "## Upgraded Packages"
@@ -378,6 +415,15 @@ write_post_update_report() {
       echo "⚠️ Missing source tree: /usr/src/linux-${latest_k}"
     fi
 
+    if [ "$failed_count" -gt 0 ]; then
+      echo
+      echo "## Failed Packages"
+      echo
+      echo "These packages did not merge; the rest of the update completed:"
+      echo
+      sed 's/^/- /' "$failures_file"
+    fi
+
     echo
     echo "## Remaining Updates"
     echo
@@ -391,6 +437,98 @@ write_post_update_report() {
   } | tee "$post_md"
 
   say "Wrote post-update report: $post_md"
+}
+
+# Haskell (dev-haskell/*) packages carry an ABI hash that Portage sub-slots do
+# not track, so a GHC or library upgrade leaves installed packages with broken
+# dependencies and every Haskell ebuild dies in src_configure with:
+#   //==-- Please, run 'haskell-updater' to fix broken packages --==//
+haskell_breakage_requested() {
+  grep -q "Please, run 'haskell-updater'" "$1"
+}
+
+# True when the installed Haskell packages already fail their own dependency
+# check, which every dev-haskell build repeats before configuring.
+haskell_installed_packages_broken() {
+  command -v ghc-pkg >/dev/null 2>&1 || return 1
+  ! ghc-pkg check --simple-output >/dev/null 2>&1
+}
+
+# Precheck-time warning: the pending update will strand the installed Haskell
+# packages, either because they are broken already or because GHC / the
+# dev-haskell libraries they link against are being replaced.
+# Emits the markdown bullets explaining why a Haskell rebuild is coming; empty
+# output means the pending update is harmless for the installed Haskell stack.
+haskell_risk_reasons() {
+  local pretend_log="$1" reasons="" pending_ghc pending_haskell
+
+  if haskell_installed_packages_broken; then
+    reasons+="- Installed Haskell packages are already broken (\`ghc-pkg check\` reports errors)"$'\n'
+  fi
+
+  pending_ghc="$(grep -cE '^\[ebuild[^]]*\][[:space:]]+dev-lang/ghc-' "$pretend_log" || true)"
+  if [ "${pending_ghc:-0}" -gt 0 ]; then
+    reasons+="- \`dev-lang/ghc\` is being upgraded, which invalidates every installed \`dev-haskell\` package"$'\n'
+  fi
+
+  pending_haskell="$(grep -cE '^\[ebuild[^]]*\][[:space:]]+dev-haskell/' "$pretend_log" || true)"
+  if [ "${pending_haskell:-0}" -gt 0 ]; then
+    reasons+="- ${pending_haskell} \`dev-haskell\` package(s) are being upgraded"$'\n'
+  fi
+
+  printf '%s' "$reasons"
+}
+
+# Prints the precheck warning and records it in precheck-<DATE>.md, so the
+# reason survives after the terminal output is gone.
+report_haskell_update_risk() {
+  local pretend_log="$1" reasons
+  reasons="$(haskell_risk_reasons "$pretend_log")"
+  [ -n "$reasons" ] || return 0
+
+  say "WARN: this update will need a Haskell rebuild afterwards:"
+  printf '%s' "$reasons" | sed 's/^- /  - /'
+  say "  Run 'bash scripts/update.sh --haskell-only' (or let --apply do it automatically)."
+
+  {
+    echo
+    echo "## Haskell Rebuild Required"
+    echo
+    printf '%s' "$reasons"
+    echo
+    echo
+    echo "Run \`bash scripts/update.sh --haskell-only\` afterwards, or let \`--apply\` do it automatically."
+  } >>"$precheck_md"
+}
+
+# Rebuilds the installed Haskell packages that no longer match the tree.
+# Optional arguments are atoms, forwarded to emerge so one broken dependency can
+# be targeted (e.g. dev-haskell/tls).
+# Returns non-zero, with the manual steps, when haskell-updater is unavailable.
+repair_haskell_packages() {
+  local hu_args=(--all) atoms="${*:-}"
+
+  if ! command -v haskell-updater >/dev/null 2>&1; then
+    say "WARN: haskell-updater is not installed, so the broken dev-haskell packages cannot be rebuilt here."
+    say "Fix the Haskell breakage and rerun this script:"
+    say "  echo 'app-admin/haskell-updater ~amd64' >> /etc/portage/package.accept_keywords/haskell-updater"
+    say "  emerge --oneshot --ask=n app-admin/haskell-updater"
+    say "  haskell-updater --all"
+    return 1
+  fi
+
+  if [ -n "$atoms" ]; then
+    hu_args+=(-- "$@")
+    say "Rebuilding Haskell packages (${atoms})..."
+  else
+    say "Rebuilding broken Haskell packages (haskell-updater --all)..."
+  fi
+
+  if ! haskell-updater "${hu_args[@]}"; then
+    say "WARN: haskell-updater failed; run it manually before retrying the update."
+    return 1
+  fi
+  return 0
 }
 
 maybe_fix_linux_symlink() {
@@ -437,6 +575,14 @@ main() {
     exit 0
   fi
 
+  if [ "$HASKELL_ONLY" = "true" ]; then
+    if repair_haskell_packages ${args[@]+"${args[@]}"}; then
+      say "Done."
+      exit 0
+    fi
+    exit 1
+  fi
+
   # Sync if requested/default (only when a mode was selected)
   maybe_sync
   maybe_update_eix
@@ -458,6 +604,7 @@ main() {
     say "emerge pretend returned non-zero, but no fatal errors detected; continuing."
   fi
   summarize_pretend_to_md <"$precheck_md.tmp" > /dev/null
+  report_haskell_update_risk "$precheck_md.tmp"
   rm -f "$precheck_md.tmp"
   say "Wrote precheck: $precheck_md"
 
@@ -477,10 +624,37 @@ main() {
     exit 0
   fi
 
-  # Perform the update
+  # Perform the update. Tee the output so a Haskell ABI breakage can be
+  # recognised while emerge's progress still reaches the terminal.
+  local apply_log status
+  apply_log="$(mktemp)"
   say "Performing system update (emerge ${EMERGE_UPDATE[*]})..."
-  if ! emerge "${EMERGE_UPDATE[@]}"; then
-    say "Update failed. No post-update report generated."
+  status=0
+  emerge "${EMERGE_UPDATE[@]}" 2>&1 | tee "$apply_log" || status=$?
+
+  if [ "$status" -ne 0 ] && haskell_breakage_requested "$apply_log"; then
+    say "Haskell ABI breakage detected: installed dev-haskell packages are broken."
+    if repair_haskell_packages; then
+      say "Retrying system update (emerge ${EMERGE_UPDATE[*]})..."
+      status=0
+      emerge "${EMERGE_UPDATE[@]}" 2>&1 | tee "$apply_log" || status=$?
+    fi
+  fi
+  rm -f "$apply_log"
+
+  if [ "$status" -ne 0 ]; then
+    # --keep-going means most of @world may have merged; keep a record of what
+    # did not, rather than discarding the whole run.
+    local failures_file
+    failures_file="$(mktemp)"
+    failed_packages_from_log "$apply_log" >"$failures_file"
+    if [ -s "$failures_file" ]; then
+      say "Update incomplete: $(wc -l <"$failures_file" | tr -d ' ') package(s) failed to merge."
+      write_post_update_report "$failures_file"
+    else
+      say "Update failed. No post-update report generated."
+    fi
+    rm -f "$apply_log" "$failures_file"
     exit 1
   fi
 
