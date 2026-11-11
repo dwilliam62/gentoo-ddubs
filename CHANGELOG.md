@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## Nov 2026
 
+- Waybar no longer dies silently on a bad include
+  - A zero-byte `~/.config/hypr/waybar/UserModules` made jsoncpp fail with `Error parsing JSON: * Line 1, Column 1`; Waybar exits before drawing anything, the message names no file, and the only visible symptom is "no bar"
+  - New `scripts/check-waybar-config.sh` resolves the config's `include` list and names the file that is empty, missing or invalid, accepting the comments and trailing commas jsoncpp allows so it never reports a document Waybar itself accepts
+  - KooL's `WaybarStartup.sh` runs it before launching, so the reason is recorded in `waybar-startup.log` instead of leaving an empty screen
+- `gui-apps/waybar` is built with the modules the bar config uses
+  - `system/etc/portage/package.use/waybar` enables `mpris network pulseaudio tray`; the bar logged `Unknown module` for all four and rendered empty slots
+  - `emerge -pv` shows only waybar itself rebuilding - no new dependencies
 - `update.sh` survives Haskell ABI breakage
   - A `--apply` run used to abort as soon as a `dev-haskell` package died in `src_configure` with `//==-- Please, run 'haskell-updater' to fix broken packages --==//` (seen with `dev-haskell/tls-2.1.5`), leaving the rest of `@world` unmerged
   - Portage sub-slots cannot track GHC/library ABI hashes, so the apply step now recognises that message, runs `haskell-updater --all` and retries the update once

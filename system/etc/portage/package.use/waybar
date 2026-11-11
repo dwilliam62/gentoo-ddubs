@@ -1,0 +1,7 @@
+# Modules the Waybar config actually uses.
+#
+# Without these the bar logs `Unknown module: <name>` for each and renders an
+# empty slot: mpris (media player), network, pulseaudio (volume) and tray.
+# Rebuild only: `sudo emerge -1 gui-apps/waybar` - the dry run shows no new
+# dependencies.
+gui-apps/waybar mpris network pulseaudio tray
